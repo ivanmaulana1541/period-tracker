@@ -3,8 +3,7 @@
 <head>
 <title>🌙 Luna Period Tracker</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="manifest" href="./manifest.json">
-
+<link rel="manifest" href="manifest.json">
 
 <style>
 body{
@@ -15,21 +14,9 @@ max-width:500px;
 margin:auto;
 }
 
-#splash{
-position:fixed;
-inset:0;
-background:#ff4d88;
-display:flex;
-justify-content:center;
-align-items:center;
-color:white;
-font-size:28px;
-z-index:999;
-animation:fadeOut 1s ease 2s forwards;
-}
-
-@keyframes fadeOut{
-to{opacity:0; visibility:hidden;}
+h1{
+color:#d63384;
+text-align:center;
 }
 
 .card{
@@ -38,26 +25,29 @@ padding:15px;
 border-radius:12px;
 box-shadow:0 3px 8px rgba(0,0,0,0.1);
 margin-bottom:15px;
-animation:fadeIn 0.8s ease;
+animation:fade .4s ease;
 }
 
-@keyframes fadeIn{
-from{opacity:0; transform:translateY(10px);}
-to{opacity:1;}
+@keyframes fade{
+from{opacity:0;transform:translateY(10px)}
+to{opacity:1;transform:translateY(0)}
 }
 
 button{
 background:#ff4d88;
 color:white;
 border:none;
-padding:10px;
+padding:12px;
 border-radius:8px;
 width:100%;
 margin-top:8px;
 font-size:16px;
+cursor:pointer;
 }
 
-button:active{transform:scale(.95);}
+button:active{
+transform:scale(.98);
+}
 
 input{
 width:100%;
@@ -66,61 +56,32 @@ border-radius:8px;
 border:1px solid #ddd;
 }
 
-#calendar{
-display:grid;
-grid-template-columns:repeat(7,1fr);
-gap:5px;
+li{
+display:flex;
+justify-content:space-between;
+padding:8px 0;
+border-bottom:1px solid #eee;
 }
 
-.day{
-padding:8px;
-border-radius:6px;
-background:#f3f3f3;
-font-size:12px;
+.small{
+font-size:14px;
+color:#666;
 }
-
-.period{background:#ff6b9a;color:white;}
-.predicted{background:#ffa94d;color:white;}
-
-.bar{
-height:20px;
-background:#ff6b9a;
-margin:4px 0;
-border-radius:6px;
-color:white;
-font-size:12px;
-padding-left:6px;
-animation:grow .6s ease;
-}
-
-@keyframes grow{
-from{width:0;}
-}
-
-.small{font-size:14px;color:#666;}
 </style>
 </head>
 
 <body>
 
-<div id="splash">🌙 Luna Tracker</div>
-
-<h2>🌙 Luna Period Tracker</h2>
+<h1>🌙 Luna Period Tracker</h1>
 
 <div class="card">
 <input type="date" id="date">
 <button onclick="add()">Simpan Tanggal</button>
-<button onclick="exportData()">Backup Data</button>
 </div>
 
 <div class="card">
-<h3>Status & Prediksi</h3>
-<div id="prediction" class="small"></div>
-</div>
-
-<div class="card">
-<h3>Kalender</h3>
-<div id="calendar"></div>
+<h3>Prediksi berikutnya</h3>
+<div id="prediction">Belum ada data</div>
 </div>
 
 <div class="card">
@@ -128,143 +89,86 @@ from{width:0;}
 <div id="stats"></div>
 </div>
 
+<div class="card">
+<h3>Riwayat</h3>
+<ul id="history"></ul>
+</div>
+
 <script>
-
-let defaultCycle=28;
-
-function getData(){
-return JSON.parse(localStorage.getItem("period"))||[];
+if("serviceWorker" in navigator){
+navigator.serviceWorker.register("service-worker.js");
 }
 
-function saveData(d){
-localStorage.setItem("period",JSON.stringify(d));
+let data = JSON.parse(localStorage.getItem("luna")) || [];
+
+function save(){
+localStorage.setItem("luna", JSON.stringify(data));
 }
 
 function add(){
-let val=document.getElementById("date").value;
-if(!val)return;
-let d=getData();
-d.push(val);
-d.sort();
-saveData(d);
-update();
-}
+let date = document.getElementById("date").value;
+if(!date) return;
 
-function getGaps(){
-let d=getData(),g=[];
-for(let i=1;i<d.length;i++){
-let a=new Date(d[i-1]);
-let b=new Date(d[i]);
-g.push(Math.round((b-a)/(1000*60*60*24)));
-}
-return g;
+let mood = prompt("Mood hari ini? 😊😴😡","");
+data.push({date,mood});
+
+data.sort((a,b)=>new Date(a.date)-new Date(b.date));
+
+save();
+render();
 }
 
 function avgCycle(){
-let g=getGaps();
-if(!g.length)return defaultCycle;
-return Math.round(g.reduce((a,b)=>a+b)/g.length);
+if(data.length<2) return null;
+
+let gaps=[];
+
+for(let i=1;i<data.length;i++){
+let d1=new Date(data[i-1].date);
+let d2=new Date(data[i].date);
+gaps.push((d2-d1)/(1000*60*60*24));
+}
+
+return Math.round(gaps.reduce((a,b)=>a+b)/gaps.length);
 }
 
 function predict(){
-let data=getData();
-let box=document.getElementById("prediction");
+let avg=avgCycle();
+if(!avg) return "Belum cukup data";
 
-if(!data.length){
-box.innerHTML="Belum ada data";
-return;
+let last=new Date(data[data.length-1].date);
+last.setDate(last.getDate()+avg);
+
+return last.toLocaleDateString();
 }
 
-let cycle=avgCycle();
-let last=new Date(data.at(-1));
-let next=new Date(last);
-next.setDate(next.getDate()+cycle);
+function render(){
 
-let today=new Date();
-let diff=Math.ceil((next-today)/(86400000));
+let list=document.getElementById("history");
+list.innerHTML="";
 
-let reminder="";
-if(diff<=3 && diff>0) reminder="🔔 Periode akan datang!";
-if(diff<=0) reminder="🔴 Sedang berlangsung";
+data.slice().reverse().forEach(item=>{
+let li=document.createElement("li");
 
-box.innerHTML=`
-Perkiraan: <b>${next.toLocaleDateString()}</b><br>
-Rata-rata siklus: ${cycle} hari<br>
-${reminder}<br>
-${diff>0?diff+" hari lagi":"Hari ini"}
+li.innerHTML=`
+<div>
+${new Date(item.date).toLocaleDateString()}
+<div class="small">${item.mood || ""}</div>
+</div>
 `;
-}
 
-function drawCalendar(){
-let cal=document.getElementById("calendar");
-cal.innerHTML="";
-
-let now=new Date();
-let y=now.getFullYear();
-let m=now.getMonth();
-
-let first=new Date(y,m,1).getDay();
-let days=new Date(y,m+1,0).getDate();
-
-let data=getData().map(d=>new Date(d).toDateString());
-
-let next="";
-if(getData().length){
-let last=new Date(getData().at(-1));
-last.setDate(last.getDate()+avgCycle());
-next=last.toDateString();
-}
-
-for(let i=0;i<first;i++) cal.innerHTML+="<div></div>";
-
-for(let d=1;d<=days;d++){
-let date=new Date(y,m,d);
-let cls="day";
-
-if(data.includes(date.toDateString())) cls+=" period";
-if(date.toDateString()===next) cls+=" predicted";
-
-cal.innerHTML+=`<div class="${cls}">${d}</div>`;
-}
-}
-
-function drawStats(){
-let box=document.getElementById("stats");
-box.innerHTML="";
-let gaps=getGaps();
-
-if(!gaps.length){
-box.innerHTML="Belum cukup data";
-return;
-}
-
-gaps.forEach(g=>{
-box.innerHTML+=`<div class="bar" style="width:${g*5}px">${g} hari</div>`;
+list.appendChild(li);
 });
+
+document.getElementById("prediction").innerText=predict();
+
+let avg=avgCycle();
+
+document.getElementById("stats").innerText=
+avg ? `Rata-rata siklus: ${avg} hari` : "Belum cukup data";
 }
 
-function exportData(){
-let data=getData();
-let blob=new Blob([JSON.stringify(data)],{type:"application/json"});
-let a=document.createElement("a");
-a.href=URL.createObjectURL(blob);
-a.download="luna-backup.json";
-a.click();
-}
-
-function update(){
-predict();
-drawCalendar();
-drawStats();
-}
-
-update();
-
-if("serviceWorker" in navigator){
-navigator.serviceWorker.register("./service-worker.js");
-
-}
-
+render();
 </script>
 
 </body>
