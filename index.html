@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Period Tracker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { font-family: Arial; padding: 20px; }
+input, button { padding: 10px; margin: 5px; }
+</style>
+</head>
+
+<body>
+
+<h2>🌸 Period Tracker</h2>
+
+<input type="date" id="date">
+<button onclick="save()">Simpan</button>
+
+<h3>Riwayat:</h3>
+<ul id="list"></ul>
+
+<script>
+function save(){
+let date = document.getElementById("date").value;
+let data = JSON.parse(localStorage.getItem("period")) || [];
+data.push(date);
+localStorage.setItem("period", JSON.stringify(data));
+load();
+}
+
+function load(){
+let data = JSON.parse(localStorage.getItem("period")) || [];
+let list = document.getElementById("list");
+list.innerHTML="";
+data.forEach(d=>{
+let li=document.createElement("li");
+li.textContent=d;
+list.appendChild(li);
+});
+}
+load();
+</script>
+
+</body>
+</html>
