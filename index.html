@@ -66,4 +66,104 @@ color:#666;
 
 <div class="card">
 <h3>Prediksi berikutnya</h3>
-<div id="prediction"
+<div id="prediction" class="small">Belum ada data</div>
+</div>
+
+<div class="card">
+<h3>Riwayat</h3>
+<ul id="list"></ul>
+</div>
+
+<script>
+
+let defaultCycle = 28;
+
+function getData(){
+return JSON.parse(localStorage.getItem("period")) || [];
+}
+
+function saveData(d){
+localStorage.setItem("period", JSON.stringify(d));
+}
+
+function add(){
+let val=document.getElementById("date").value;
+if(!val) return;
+
+let data=getData();
+data.push(val);
+data.sort();
+saveData(data);
+
+update();
+}
+
+function remove(i){
+let data=getData();
+data.splice(i,1);
+saveData(data);
+update();
+}
+
+function avgCycle(){
+let data=getData();
+if(data.length<2) return defaultCycle;
+
+let gaps=[];
+
+for(let i=1;i<data.length;i++){
+let d1=new Date(data[i-1]);
+let d2=new Date(data[i]);
+gaps.push((d2-d1)/(1000*60*60*24));
+}
+
+return Math.round(gaps.reduce((a,b)=>a+b)/gaps.length);
+}
+
+function predict(){
+let data=getData();
+let box=document.getElementById("prediction");
+
+if(data.length===0){
+box.innerHTML="Belum ada data";
+return;
+}
+
+let cycle=avgCycle();
+let last=new Date(data[data.length-1]);
+let next=new Date(last);
+next.setDate(next.getDate()+cycle);
+
+let today=new Date();
+let diff=Math.ceil((next-today)/(1000*60*60*24));
+
+box.innerHTML=`
+Perkiraan: <b>${next.toLocaleDateString()}</b><br>
+Rata-rata siklus: ${cycle} hari<br>
+${diff>0 ? diff+" hari lagi" : "Sedang berlangsung"}
+`;
+}
+
+function update(){
+let data=getData();
+let list=document.getElementById("list");
+list.innerHTML="";
+
+data.forEach((d,i)=>{
+let li=document.createElement("li");
+li.innerHTML=`
+<span>${new Date(d).toLocaleDateString()}</span>
+<button onclick="remove(${i})" style="width:auto;background:#ff6b6b">Hapus</button>
+`;
+list.appendChild(li);
+});
+
+predict();
+}
+
+update();
+
+</script>
+
+</body>
+</html>
