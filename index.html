@@ -71,14 +71,17 @@ background:#f3f3f3;
 font-size:12px;
 }
 
-.period{
-background:#ff6b9a;
-color:white;
-}
+.period{background:#ff6b9a;color:white;}
+.predicted{background:#ffa94d;color:white;}
 
-.predicted{
-background:#ffa94d;
+.bar{
+height:20px;
+background:#ff6b9a;
+margin:4px 0;
+border-radius:6px;
 color:white;
+font-size:12px;
+padding-left:6px;
 }
 </style>
 </head>
@@ -103,31 +106,34 @@ color:white;
 </div>
 
 <div class="card">
+<h3>Statistik Siklus</h3>
+<div id="stats"></div>
+</div>
+
+<div class="card">
 <h3>Riwayat</h3>
 <ul id="list"></ul>
 </div>
 
 <script>
 
-let defaultCycle = 28;
+let defaultCycle=28;
 
 function getData(){
-return JSON.parse(localStorage.getItem("period")) || [];
+return JSON.parse(localStorage.getItem("period"))||[];
 }
 
 function saveData(d){
-localStorage.setItem("period", JSON.stringify(d));
+localStorage.setItem("period",JSON.stringify(d));
 }
 
 function add(){
 let val=document.getElementById("date").value;
-if(!val) return;
-
+if(!val)return;
 let data=getData();
 data.push(val);
 data.sort();
 saveData(data);
-
 update();
 }
 
@@ -138,18 +144,21 @@ saveData(data);
 update();
 }
 
-function avgCycle(){
+function getGaps(){
 let data=getData();
-if(data.length<2) return defaultCycle;
-
 let gaps=[];
 for(let i=1;i<data.length;i++){
 let d1=new Date(data[i-1]);
 let d2=new Date(data[i]);
-gaps.push((d2-d1)/(1000*60*60*24));
+gaps.push(Math.round((d2-d1)/(1000*60*60*24)));
+}
+return gaps;
 }
 
-return Math.round(gaps.reduce((a,b)=>a+b)/gaps.length);
+function avgCycle(){
+let g=getGaps();
+if(g.length===0)return defaultCycle;
+return Math.round(g.reduce((a,b)=>a+b)/g.length);
 }
 
 function predict(){
@@ -177,7 +186,7 @@ box.innerHTML=`
 Perkiraan: <b>${next.toLocaleDateString()}</b><br>
 Rata-rata siklus: ${cycle} hari<br>
 Status: <b>${status}</b><br>
-${diff>0 ? diff+" hari lagi" : "Hari ini / sedang berlangsung"}
+${diff>0?diff+" hari lagi":"Hari ini"}
 `;
 }
 
@@ -185,9 +194,9 @@ function drawCalendar(){
 let cal=document.getElementById("calendar");
 cal.innerHTML="";
 
-let today=new Date();
-let year=today.getFullYear();
-let month=today.getMonth();
+let now=new Date();
+let year=now.getFullYear();
+let month=now.getMonth();
 
 let firstDay=new Date(year,month,1).getDay();
 let days=new Date(year,month+1,0).getDate();
@@ -201,9 +210,7 @@ last.setDate(last.getDate()+avgCycle());
 next=last.toDateString();
 }
 
-for(let i=0;i<firstDay;i++){
-cal.innerHTML+="<div></div>";
-}
+for(let i=0;i<firstDay;i++) cal.innerHTML+="<div></div>";
 
 for(let d=1;d<=days;d++){
 let date=new Date(year,month,d);
@@ -214,6 +221,22 @@ if(date.toDateString()===next) cls+=" predicted";
 
 cal.innerHTML+=`<div class="${cls}">${d}</div>`;
 }
+}
+
+function drawStats(){
+let box=document.getElementById("stats");
+box.innerHTML="";
+
+let gaps=getGaps();
+
+if(gaps.length===0){
+box.innerHTML="Belum cukup data";
+return;
+}
+
+gaps.forEach(g=>{
+box.innerHTML+=`<div class="bar" style="width:${g*5}px">${g} hari</div>`;
+});
 }
 
 function update(){
@@ -232,6 +255,7 @@ list.appendChild(li);
 
 predict();
 drawCalendar();
+drawStats();
 }
 
 update();
