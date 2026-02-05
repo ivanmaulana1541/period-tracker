@@ -10,13 +10,13 @@ body{
 font-family:system-ui;
 background:#fff5f8;
 padding:20px;
-max-width:500px;
+max-width:520px;
 margin:auto;
 }
 
 h1{
-color:#d63384;
 text-align:center;
+color:#d63384;
 }
 
 .card{
@@ -67,6 +67,34 @@ border-bottom:1px solid #eee;
 font-size:14px;
 color:#666;
 }
+
+.calendar{
+display:grid;
+grid-template-columns:repeat(7,1fr);
+gap:4px;
+text-align:center;
+}
+
+.day{
+padding:6px;
+border-radius:6px;
+background:#f7f7f7;
+font-size:14px;
+}
+
+.period{
+background:#ffb3c9;
+font-weight:bold;
+}
+
+.highlight{
+background:#ff4d88;
+color:white;
+}
+
+canvas{
+width:100%;
+}
 </style>
 </head>
 
@@ -77,16 +105,24 @@ color:#666;
 <div class="card">
 <input type="date" id="date">
 <button onclick="add()">Simpan Tanggal</button>
+<button onclick="resetData()" style="background:#999">Reset Data</button>
 </div>
 
 <div class="card">
 <h3>Prediksi berikutnya</h3>
 <div id="prediction">Belum ada data</div>
+<div class="small" id="countdown"></div>
 </div>
 
 <div class="card">
 <h3>Statistik</h3>
 <div id="stats"></div>
+<canvas id="chart"></canvas>
+</div>
+
+<div class="card">
+<h3>Kalender bulan ini</h3>
+<div class="calendar" id="calendar"></div>
 </div>
 
 <div class="card">
@@ -106,23 +142,29 @@ localStorage.setItem("luna", JSON.stringify(data));
 }
 
 function add(){
-let date = document.getElementById("date").value;
+let date=document.getElementById("date").value;
 if(!date) return;
 
-let mood = prompt("Mood hari ini? 😊😴😡","");
+let mood=prompt("Mood hari ini? 😊😴😡❤️","");
 data.push({date,mood});
-
 data.sort((a,b)=>new Date(a.date)-new Date(b.date));
 
 save();
 render();
 }
 
+function resetData(){
+if(confirm("Hapus semua data?")){
+data=[];
+save();
+render();
+}
+}
+
 function avgCycle(){
 if(data.length<2) return null;
 
 let gaps=[];
-
 for(let i=1;i<data.length;i++){
 let d1=new Date(data[i-1].date);
 let d2=new Date(data[i].date);
@@ -132,18 +174,33 @@ gaps.push((d2-d1)/(1000*60*60*24));
 return Math.round(gaps.reduce((a,b)=>a+b)/gaps.length);
 }
 
-function predict(){
+function nextDate(){
 let avg=avgCycle();
-if(!avg) return "Belum cukup data";
+if(!avg) return null;
 
 let last=new Date(data[data.length-1].date);
 last.setDate(last.getDate()+avg);
 
-return last.toLocaleDateString();
+return last;
 }
 
-function render(){
+function predict(){
+let next=nextDate();
+if(!next) return "Belum cukup data";
 
+return next.toLocaleDateString();
+}
+
+function countdown(){
+let next=nextDate();
+if(!next) return "";
+
+let diff=Math.ceil((next-new Date())/(1000*60*60*24));
+
+return diff>0?`${diff} hari lagi`: "Hari ini!";
+}
+
+function renderHistory(){
 let list=document.getElementById("history");
 list.innerHTML="";
 
@@ -153,19 +210,79 @@ let li=document.createElement("li");
 li.innerHTML=`
 <div>
 ${new Date(item.date).toLocaleDateString()}
-<div class="small">${item.mood || ""}</div>
+<div class="small">${item.mood||""}</div>
 </div>
 `;
 
 list.appendChild(li);
 });
+}
+
+function renderCalendar(){
+let cal=document.getElementById("calendar");
+cal.innerHTML="";
+
+let now=new Date();
+let year=now.getFullYear();
+let month=now.getMonth();
+
+let days=new Date(year,month+1,0).getDate();
+
+let periodDays=data.map(d=>new Date(d.date).getDate());
+
+for(let i=1;i<=days;i++){
+let div=document.createElement("div");
+div.className="day";
+div.innerText=i;
+
+if(periodDays.includes(i)) div.classList.add("period");
+
+cal.appendChild(div);
+}
+}
+
+function drawChart(){
+let canvas=document.getElementById("chart");
+let ctx=canvas.getContext("2d");
+canvas.height=120;
+
+ctx.clearRect(0,0,canvas.width,canvas.height);
+
+if(data.length<2) return;
+
+let gaps=[];
+for(let i=1;i<data.length;i++){
+let d1=new Date(data[i-1].date);
+let d2=new Date(data[i].date);
+gaps.push((d2-d1)/(1000*60*60*24));
+}
+
+let max=Math.max(...gaps);
+let w=canvas.width/gaps.length;
+
+ctx.strokeStyle="#ff4d88";
+ctx.beginPath();
+
+gaps.forEach((g,i)=>{
+let x=i*w;
+let y=120-(g/max)*100;
+ctx.lineTo(x,y);
+});
+
+ctx.stroke();
+}
+
+function render(){
+renderHistory();
+renderCalendar();
+drawChart();
 
 document.getElementById("prediction").innerText=predict();
+document.getElementById("countdown").innerText=countdown();
 
 let avg=avgCycle();
-
 document.getElementById("stats").innerText=
-avg ? `Rata-rata siklus: ${avg} hari` : "Belum cukup data";
+avg?`Rata-rata siklus: ${avg} hari`:"Belum cukup data";
 }
 
 render();
