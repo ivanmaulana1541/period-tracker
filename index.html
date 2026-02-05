@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>🌸Luna Period Tracker</title>
+<title>🌸 Period Tracker</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
@@ -13,7 +13,10 @@ max-width:500px;
 margin:auto;
 }
 
-h1{color:#d63384}
+h1{
+color:#d63384;
+text-align:center;
+}
 
 .card{
 background:white;
@@ -52,12 +55,37 @@ border-bottom:1px solid #eee;
 font-size:14px;
 color:#666;
 }
+
+#calendar{
+display:grid;
+grid-template-columns:repeat(7,1fr);
+gap:5px;
+text-align:center;
+margin-top:10px;
+}
+
+.day{
+padding:8px;
+border-radius:6px;
+background:#f3f3f3;
+font-size:12px;
+}
+
+.period{
+background:#ff6b9a;
+color:white;
+}
+
+.predicted{
+background:#ffa94d;
+color:white;
+}
 </style>
 </head>
 
 <body>
 
-<h1>🌸 Luna Period Tracker</h1>
+<h1>🌸 Period Tracker</h1>
 
 <div class="card">
 <input type="date" id="date">
@@ -67,6 +95,11 @@ color:#666;
 <div class="card">
 <h3>Prediksi berikutnya</h3>
 <div id="prediction" class="small">Belum ada data</div>
+</div>
+
+<div class="card">
+<h3>Kalender Siklus</h3>
+<div id="calendar"></div>
 </div>
 
 <div class="card">
@@ -110,7 +143,6 @@ let data=getData();
 if(data.length<2) return defaultCycle;
 
 let gaps=[];
-
 for(let i=1;i<data.length;i++){
 let d1=new Date(data[i-1]);
 let d2=new Date(data[i]);
@@ -149,20 +181,39 @@ ${diff>0 ? diff+" hari lagi" : "Hari ini / sedang berlangsung"}
 `;
 }
 
-
-let cycle=avgCycle();
-let last=new Date(data[data.length-1]);
-let next=new Date(last);
-next.setDate(next.getDate()+cycle);
+function drawCalendar(){
+let cal=document.getElementById("calendar");
+cal.innerHTML="";
 
 let today=new Date();
-let diff=Math.ceil((next-today)/(1000*60*60*24));
+let year=today.getFullYear();
+let month=today.getMonth();
 
-box.innerHTML=`
-Perkiraan: <b>${next.toLocaleDateString()}</b><br>
-Rata-rata siklus: ${cycle} hari<br>
-${diff>0 ? diff+" hari lagi" : "Sedang berlangsung"}
-`;
+let firstDay=new Date(year,month,1).getDay();
+let days=new Date(year,month+1,0).getDate();
+
+let data=getData().map(d=>new Date(d).toDateString());
+
+let next="";
+if(getData().length>0){
+let last=new Date(getData().slice(-1)[0]);
+last.setDate(last.getDate()+avgCycle());
+next=last.toDateString();
+}
+
+for(let i=0;i<firstDay;i++){
+cal.innerHTML+="<div></div>";
+}
+
+for(let d=1;d<=days;d++){
+let date=new Date(year,month,d);
+let cls="day";
+
+if(data.includes(date.toDateString())) cls+=" period";
+if(date.toDateString()===next) cls+=" predicted";
+
+cal.innerHTML+=`<div class="${cls}">${d}</div>`;
+}
 }
 
 function update(){
@@ -180,6 +231,7 @@ list.appendChild(li);
 });
 
 predict();
+drawCalendar();
 }
 
 update();
