@@ -137,6 +137,27 @@ next.setDate(next.getDate()+cycle);
 let today=new Date();
 let diff=Math.ceil((next-today)/(1000*60*60*24));
 
+let status="🟢 Normal";
+if(diff<=3 && diff>0) status="🟠 Segera datang";
+if(diff<=0) status="🔴 Sedang berlangsung";
+
+box.innerHTML=`
+Perkiraan: <b>${next.toLocaleDateString()}</b><br>
+Rata-rata siklus: ${cycle} hari<br>
+Status: <b>${status}</b><br>
+${diff>0 ? diff+" hari lagi" : "Hari ini / sedang berlangsung"}
+`;
+}
+
+
+let cycle=avgCycle();
+let last=new Date(data[data.length-1]);
+let next=new Date(last);
+next.setDate(next.getDate()+cycle);
+
+let today=new Date();
+let diff=Math.ceil((next-today)/(1000*60*60*24));
+
 box.innerHTML=`
 Perkiraan: <b>${next.toLocaleDateString()}</b><br>
 Rata-rata siklus: ${cycle} hari<br>
