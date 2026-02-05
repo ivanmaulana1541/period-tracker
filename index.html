@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>🌸 Period Tracker</title>
+<title>🌙 Luna Periode Tracker</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link rel="manifest" href="manifest.json">
 
 <style>
 body{
@@ -87,9 +89,7 @@ font-size:12px;
 transition:0.2s;
 }
 
-.day:hover{
-transform:scale(1.1);
-}
+.day:hover{transform:scale(1.1);}
 
 .period{background:#ff6b9a;color:white;}
 .predicted{background:#ffa94d;color:white;}
@@ -113,7 +113,7 @@ from{width:0;}
 
 <body>
 
-<h1>🌸 Period Tracker</h1>
+<h1>🌙 Luna Periode Tracker</h1>
 
 <div class="card">
 <input type="date" id="date">
@@ -284,6 +284,10 @@ drawStats();
 }
 
 update();
+
+if("serviceWorker" in navigator){
+navigator.serviceWorker.register("service-worker.js");
+}
 
 </script>
 
