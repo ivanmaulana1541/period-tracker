@@ -11,11 +11,18 @@ background:#fff5f8;
 padding:20px;
 max-width:500px;
 margin:auto;
+animation:fadeIn 0.8s ease;
+}
+
+@keyframes fadeIn{
+from{opacity:0; transform:translateY(10px);}
+to{opacity:1; transform:translateY(0);}
 }
 
 h1{
 color:#d63384;
 text-align:center;
+animation:fadeIn 1s ease;
 }
 
 .card{
@@ -24,6 +31,7 @@ padding:15px;
 border-radius:12px;
 box-shadow:0 3px 8px rgba(0,0,0,0.1);
 margin-bottom:15px;
+animation:fadeIn 0.8s ease;
 }
 
 button{
@@ -35,6 +43,11 @@ border-radius:8px;
 width:100%;
 margin-top:8px;
 font-size:16px;
+transition:0.2s;
+}
+
+button:active{
+transform:scale(0.95);
 }
 
 input{
@@ -49,6 +62,7 @@ display:flex;
 justify-content:space-between;
 padding:8px 0;
 border-bottom:1px solid #eee;
+animation:fadeIn 0.4s ease;
 }
 
 .small{
@@ -62,6 +76,7 @@ grid-template-columns:repeat(7,1fr);
 gap:5px;
 text-align:center;
 margin-top:10px;
+animation:fadeIn 1s ease;
 }
 
 .day{
@@ -69,6 +84,11 @@ padding:8px;
 border-radius:6px;
 background:#f3f3f3;
 font-size:12px;
+transition:0.2s;
+}
+
+.day:hover{
+transform:scale(1.1);
 }
 
 .period{background:#ff6b9a;color:white;}
@@ -82,6 +102,11 @@ border-radius:6px;
 color:white;
 font-size:12px;
 padding-left:6px;
+animation:grow 0.6s ease;
+}
+
+@keyframes grow{
+from{width:0;}
 }
 </style>
 </head>
