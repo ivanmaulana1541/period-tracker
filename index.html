@@ -80,6 +80,11 @@ canvas{width:100%}
 </div>
 
 <div class="card">
+<h3>Dashboard Pintar</h3>
+<div id="dashboard"></div>
+</div>
+
+<div class="card">
 <h3>Insight Siklus</h3>
 <div id="insight"></div>
 </div>
@@ -103,7 +108,7 @@ canvas{width:100%}
 
 <script>
 
-// DARK MODE
+// ---------- DARK MODE ----------
 if(localStorage.getItem("dark")==="1")
 document.body.classList.add("dark");
 
@@ -113,7 +118,7 @@ localStorage.setItem("dark",
 document.body.classList.contains("dark")?"1":"0");
 }
 
-// PROFILE
+// ---------- PROFILE ----------
 let profiles=JSON.parse(localStorage.getItem("lunaProfiles"))||{Default:[]};
 let current="Default";
 
@@ -145,7 +150,7 @@ saveProfiles();
 refreshProfiles();
 }
 
-// DATA
+// ---------- DATA ----------
 function getData(){return profiles[current];}
 
 function add(){
@@ -157,7 +162,7 @@ saveProfiles();
 render();
 }
 
-// CALC
+// ---------- CALCULATIONS ----------
 function gaps(){
 let d=getData();
 let g=[];
@@ -175,49 +180,80 @@ if(!g.length) return null;
 return Math.round(g.reduce((a,b)=>a+b)/g.length);
 }
 
-function variation(){
+// adaptive prediction (lebih berat ke data terbaru)
+function adaptiveCycle(){
 let g=gaps();
-if(!g.length) return 0;
-let avg=avgCycle();
-return Math.round(g.reduce((s,x)=>s+Math.abs(x-avg),0)/g.length);
+if(!g.length) return null;
+
+let weight=0,total=0;
+
+g.forEach((v,i)=>{
+let w=i+1;
+total+=v*w;
+weight+=w;
+});
+
+return Math.round(total/weight);
+}
+
+function trend(){
+let g=gaps();
+if(g.length<3) return "Belum cukup data";
+
+let recent=g.slice(-3);
+let avgRecent=recent.reduce((a,b)=>a+b)/recent.length;
+let avgAll=avgCycle();
+
+if(avgRecent>avgAll+1) return "Siklus cenderung memanjang";
+if(avgRecent<avgAll-1) return "Siklus cenderung memendek";
+return "Siklus stabil";
 }
 
 function nextDate(){
-let avg=avgCycle();
+let avg=adaptiveCycle();
 if(!avg) return null;
+
 let last=new Date(getData().at(-1));
 last.setDate(last.getDate()+avg);
 return last;
 }
 
-// INSIGHT
-function insight(){
-let avg=avgCycle();
-let varr=variation();
-
-if(!avg) return "Belum cukup data";
-
-let reg=varr<=2?"Siklus sangat stabil":
-varr<=5?"Siklus cukup stabil":
-"Siklus tidak teratur";
-
-return `${reg} • rata-rata ${avg} hari`;
-}
-
-// PHASE
+// ---------- PHASE ----------
 function phase(){
 let next=nextDate();
 if(!next) return "";
 
-let today=new Date();
-let diff=Math.ceil((next-today)/86400000);
+let diff=Math.ceil((next-new Date())/86400000);
 
-if(diff<=5 && diff>=0) return "Fase periode mendekat";
+if(diff<=5 && diff>=0) return "Menjelang periode";
 if(diff>5 && diff<=14) return "Fase subur";
 return "Fase aman";
 }
 
-// CALENDAR
+// ---------- DASHBOARD ----------
+function dashboard(){
+let avg=adaptiveCycle();
+let t=trend();
+
+if(!avg) return "Tambahkan data untuk analisis.";
+
+return `
+Rata adaptif: ${avg} hari<br>
+Trend: ${t}
+`;
+}
+
+// ---------- INSIGHT ----------
+function insight(){
+let avg=avgCycle();
+if(!avg) return "";
+
+if(avg<24) return "Siklus relatif pendek.";
+if(avg>35) return "Siklus relatif panjang.";
+return "Siklus dalam rentang normal.";
+}
+
+// ---------- CALENDAR ----------
 function renderCalendar(){
 let cal=document.getElementById("calendar");
 cal.innerHTML="";
@@ -240,7 +276,7 @@ cal.appendChild(div);
 }
 }
 
-// CHART
+// ---------- CHART ----------
 function drawChart(){
 let canvas=document.getElementById("chart");
 let ctx=canvas.getContext("2d");
@@ -265,10 +301,13 @@ ctx.lineTo(px,py);
 ctx.stroke();
 }
 
-// RENDER
+// ---------- RENDER ----------
 function render(){
-let avg=avgCycle();
+let avg=adaptiveCycle();
 let next=nextDate();
+
+document.getElementById("dashboard").innerHTML=dashboard();
+document.getElementById("insight").innerText=insight();
 
 document.getElementById("prediction").innerText=
 next?next.toLocaleDateString():"Belum cukup data";
@@ -276,15 +315,13 @@ next?next.toLocaleDateString():"Belum cukup data";
 document.getElementById("phase").innerText=phase();
 
 document.getElementById("stats").innerText=
-avg?`Rata-rata siklus: ${avg} hari • variasi ±${variation()} hari`:"";
-
-document.getElementById("insight").innerText=insight();
+avg?`Prediksi adaptif: ${avg} hari`:"";
 
 renderCalendar();
 drawChart();
 }
 
-// INIT
+// ---------- INIT ----------
 refreshProfiles();
 render();
 
