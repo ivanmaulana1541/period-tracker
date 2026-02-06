@@ -15,17 +15,10 @@ margin:auto;
 transition:.3s;
 }
 
-.dark{
-background:#1f1f1f;
-color:white;
-}
+.dark{background:#1f1f1f;color:white;}
 
-h1{
-text-align:center;
-color:#d63384;
-}
-
-.dark h1{color:#ff8fb3}
+h1{text-align:center;color:#d63384;}
+.dark h1{color:#ff8fb3;}
 
 .card{
 background:white;
@@ -37,13 +30,11 @@ animation:fade .4s ease;
 transition:.3s;
 }
 
-.dark .card{
-background:#2b2b2b;
-}
+.dark .card{background:#2b2b2b;}
 
 @keyframes fade{
 from{opacity:0;transform:translateY(10px)}
-to{opacity:1;transform:translateY(0)}
+to{opacity:1}
 }
 
 button{
@@ -54,20 +45,10 @@ padding:12px;
 border-radius:8px;
 width:100%;
 margin-top:8px;
-font-size:16px;
 cursor:pointer;
 }
 
-button.secondary{
-background:#999;
-}
-
-input{
-width:100%;
-padding:10px;
-border-radius:8px;
-border:1px solid #ddd;
-}
+.secondary{background:#999;}
 
 .calendar{
 display:grid;
@@ -80,30 +61,15 @@ text-align:center;
 padding:6px;
 border-radius:6px;
 background:#f0f0f0;
-font-size:14px;
 }
 
-.dark .day{
-background:#3a3a3a;
-}
+.dark .day{background:#3a3a3a;}
 
-.period{background:#ffb3c9}
-.ovulation{background:#9be7ff}
-.predicted{background:#ffc4e1}
+.period{background:#ffb3c9;}
+.predicted{background:#ffc4e1;}
 
-li{
-display:flex;
-justify-content:space-between;
-padding:8px 0;
-border-bottom:1px solid #eee;
-}
-
-.small{
-font-size:14px;
-color:#666;
-}
-
-.dark .small{color:#aaa}
+.small{font-size:14px;color:#666;}
+.dark .small{color:#aaa;}
 
 canvas{width:100%}
 </style>
@@ -114,17 +80,22 @@ canvas{width:100%}
 <h1>🌙 Luna Period Tracker</h1>
 
 <div class="card">
-<input type="date" id="date">
-<button onclick="add()">Simpan Tanggal</button>
-<button class="secondary" onclick="resetData()">Reset</button>
+<select id="profile"></select>
+<button onclick="newProfile()">+ Profile</button>
 <button class="secondary" onclick="toggleDark()">Dark Mode</button>
-<button class="secondary" onclick="exportData()">Export Data</button>
+<button class="secondary" onclick="exportData()">Export</button>
+<button class="secondary" onclick="importData()">Import</button>
+</div>
+
+<div class="card">
+<input type="date" id="date">
+<button onclick="add()">Tambah Periode</button>
 </div>
 
 <div class="card">
 <h3>Prediksi berikutnya</h3>
-<div id="prediction">Belum ada data</div>
-<div class="small" id="countdown"></div>
+<div id="prediction"></div>
+<div id="countdown" class="small"></div>
 </div>
 
 <div class="card">
@@ -134,54 +105,77 @@ canvas{width:100%}
 </div>
 
 <div class="card">
-<h3>Kalender bulan ini</h3>
+<h3>Kalender</h3>
 <div id="calendar" class="calendar"></div>
 </div>
 
-<div class="card">
-<h3>Riwayat</h3>
-<ul id="history"></ul>
-</div>
-
 <script>
-if("serviceWorker" in navigator){
-navigator.serviceWorker.register("service-worker.js");
+
+// ---------- DARK MODE ----------
+if(localStorage.getItem("dark")==="1")
+document.body.classList.add("dark");
+
+function toggleDark(){
+document.body.classList.toggle("dark");
+localStorage.setItem("dark",
+document.body.classList.contains("dark")?"1":"0");
 }
 
-let data = JSON.parse(localStorage.getItem("luna")) || [];
+// ---------- PROFILE SYSTEM ----------
+let profiles = JSON.parse(localStorage.getItem("lunaProfiles")) || {Default:[]};
+let current="Default";
 
-function save(){
-localStorage.setItem("luna", JSON.stringify(data));
+function saveProfiles(){
+localStorage.setItem("lunaProfiles",JSON.stringify(profiles));
 }
+
+function refreshProfiles(){
+let sel=document.getElementById("profile");
+sel.innerHTML="";
+Object.keys(profiles).forEach(p=>{
+let opt=document.createElement("option");
+opt.textContent=p;
+sel.appendChild(opt);
+});
+sel.value=current;
+}
+
+document.getElementById("profile").onchange=e=>{
+current=e.target.value;
+render();
+};
+
+function newProfile(){
+let name=prompt("Nama profile?");
+if(!name) return;
+profiles[name]=[];
+saveProfiles();
+refreshProfiles();
+}
+
+// ---------- DATA ----------
+function getData(){return profiles[current];}
 
 function add(){
 let date=document.getElementById("date").value;
 if(!date) return;
 
-let mood=prompt("Mood hari ini? 😊","");
-data.push({date,mood});
-data.sort((a,b)=>new Date(a.date)-new Date(b.date));
-
-save();
+profiles[current].push(date);
+profiles[current].sort();
+saveProfiles();
 render();
 }
 
-function resetData(){
-if(confirm("Hapus semua data?")){
-data=[];
-save();
-render();
-}
-}
-
+// ---------- CALCULATIONS ----------
 function avgCycle(){
-if(data.length<2) return null;
+let d=getData();
+if(d.length<2) return null;
 
 let gaps=[];
-for(let i=1;i<data.length;i++){
-let d1=new Date(data[i-1].date);
-let d2=new Date(data[i].date);
-gaps.push((d2-d1)/(1000*60*60*24));
+for(let i=1;i<d.length;i++){
+let a=new Date(d[i-1]);
+let b=new Date(d[i]);
+gaps.push((b-a)/86400000);
 }
 
 return Math.round(gaps.reduce((a,b)=>a+b)/gaps.length);
@@ -191,65 +185,29 @@ function nextDate(){
 let avg=avgCycle();
 if(!avg) return null;
 
-let last=new Date(data[data.length-1].date);
+let last=new Date(getData().at(-1));
 last.setDate(last.getDate()+avg);
 return last;
 }
 
-function ovulationDate(){
-let next=nextDate();
-if(!next) return null;
-next.setDate(next.getDate()-14);
-return next;
-}
-
-function countdown(){
-let next=nextDate();
-if(!next) return "";
-
-let diff=Math.ceil((next-new Date())/(1000*60*60*24));
-return diff>0?`${diff} hari lagi`: "Hari ini!";
-}
-
-function renderHistory(){
-let list=document.getElementById("history");
-list.innerHTML="";
-
-data.slice().reverse().forEach(item=>{
-let li=document.createElement("li");
-li.innerHTML=`
-<div>
-${new Date(item.date).toLocaleDateString()}
-<div class="small">${item.mood||""}</div>
-</div>`;
-list.appendChild(li);
-});
-}
-
+// ---------- UI ----------
 function renderCalendar(){
 let cal=document.getElementById("calendar");
 cal.innerHTML="";
 
 let now=new Date();
-let year=now.getFullYear();
-let month=now.getMonth();
-let days=new Date(year,month+1,0).getDate();
+let days=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
 
-let periodDays=data.map(d=>new Date(d.date).getDate());
-
+let marks=getData().map(d=>new Date(d).getDate());
 let next=nextDate();
-let ovu=ovulationDate();
 
 for(let i=1;i<=days;i++){
 let div=document.createElement("div");
 div.className="day";
 div.innerText=i;
 
-if(periodDays.includes(i)) div.classList.add("period");
-
+if(marks.includes(i)) div.classList.add("period");
 if(next && next.getDate()==i) div.classList.add("predicted");
-
-if(ovu && ovu.getDate()==i) div.classList.add("ovulation");
 
 cal.appendChild(div);
 }
@@ -261,13 +219,14 @@ let ctx=canvas.getContext("2d");
 canvas.height=120;
 ctx.clearRect(0,0,canvas.width,canvas.height);
 
-if(data.length<2) return;
+let d=getData();
+if(d.length<2) return;
 
 let gaps=[];
-for(let i=1;i<data.length;i++){
-let d1=new Date(data[i-1].date);
-let d2=new Date(data[i].date);
-gaps.push((d2-d1)/(1000*60*60*24));
+for(let i=1;i<d.length;i++){
+let a=new Date(d[i-1]);
+let b=new Date(d[i]);
+gaps.push((b-a)/86400000);
 }
 
 let max=Math.max(...gaps);
@@ -285,35 +244,53 @@ ctx.lineTo(x,y);
 ctx.stroke();
 }
 
+// ---------- EXPORT / IMPORT ----------
 function exportData(){
-let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+let blob=new Blob([JSON.stringify(profiles)],{type:"application/json"});
 let a=document.createElement("a");
 a.href=URL.createObjectURL(blob);
-a.download="luna-data.json";
+a.download="luna-backup.json";
 a.click();
 }
 
-function toggleDark(){
-document.body.classList.toggle("dark");
+function importData(){
+let input=document.createElement("input");
+input.type="file";
+input.onchange=e=>{
+let reader=new FileReader();
+reader.onload=()=>{
+profiles=JSON.parse(reader.result);
+saveProfiles();
+refreshProfiles();
+render();
+};
+reader.readAsText(e.target.files[0]);
+};
+input.click();
 }
 
+// ---------- RENDER ----------
 function render(){
-renderHistory();
-renderCalendar();
-drawChart();
-
 let avg=avgCycle();
+let next=nextDate();
 
 document.getElementById("prediction").innerText=
-nextDate()?nextDate().toLocaleDateString():"Belum cukup data";
+next?next.toLocaleDateString():"Belum cukup data";
 
-document.getElementById("countdown").innerText=countdown();
+document.getElementById("countdown").innerText=
+next?Math.ceil((next-new Date())/86400000)+" hari lagi":"";
 
 document.getElementById("stats").innerText=
-avg?`Rata-rata siklus: ${avg} hari`:"Belum cukup data";
+avg?`Rata-rata siklus: ${avg} hari`:"";
+
+renderCalendar();
+drawChart();
 }
 
+// ---------- INIT ----------
+refreshProfiles();
 render();
+
 </script>
 
 </body>
