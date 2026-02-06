@@ -10,7 +10,7 @@ body{
 font-family:system-ui;
 background:#fff5f8;
 padding:20px;
-max-width:520px;
+max-width:560px;
 margin:auto;
 transition:.3s;
 }
@@ -51,11 +51,23 @@ gap:4px;
 text-align:center;
 }
 
-.day{padding:6px;border-radius:6px;background:#f0f0f0;}
+.header{
+font-weight:bold;
+font-size:13px;
+opacity:.7;
+}
+
+.day{
+padding:8px 0;
+border-radius:6px;
+background:#f0f0f0;
+}
+
 .dark .day{background:#3a3a3a;}
 
 .period{background:#ffb3c9;}
 .predicted{background:#ffc4e1;}
+.fertile{background:#b8f0ff;}
 
 .small{font-size:14px;color:#666;}
 .dark .small{color:#aaa;}
@@ -80,13 +92,8 @@ canvas{width:100%}
 </div>
 
 <div class="card">
-<h3>Dashboard Pintar</h3>
+<h3>AI Dashboard</h3>
 <div id="dashboard"></div>
-</div>
-
-<div class="card">
-<h3>Insight Siklus</h3>
-<div id="insight"></div>
 </div>
 
 <div class="card">
@@ -96,14 +103,14 @@ canvas{width:100%}
 </div>
 
 <div class="card">
-<h3>Statistik</h3>
-<div id="stats"></div>
-<canvas id="chart"></canvas>
+<h3>Kalender Profesional</h3>
+<div id="calendar" class="calendar"></div>
 </div>
 
 <div class="card">
-<h3>Kalender</h3>
-<div id="calendar" class="calendar"></div>
+<h3>Statistik</h3>
+<div id="stats"></div>
+<canvas id="chart"></canvas>
 </div>
 
 <script>
@@ -162,7 +169,7 @@ saveProfiles();
 render();
 }
 
-// ---------- CALCULATIONS ----------
+// ---------- AI CALC ----------
 function gaps(){
 let d=getData();
 let g=[];
@@ -174,18 +181,11 @@ g.push((b-a)/86400000);
 return g;
 }
 
-function avgCycle(){
-let g=gaps();
-if(!g.length) return null;
-return Math.round(g.reduce((a,b)=>a+b)/g.length);
-}
-
-// adaptive prediction (lebih berat ke data terbaru)
-function adaptiveCycle(){
+function weightedCycle(){
 let g=gaps();
 if(!g.length) return null;
 
-let weight=0,total=0;
+let total=0, weight=0;
 
 g.forEach((v,i)=>{
 let w=i+1;
@@ -193,24 +193,41 @@ total+=v*w;
 weight+=w;
 });
 
-return Math.round(total/weight);
+return total/weight;
 }
 
-function trend(){
+function trendAdjust(){
 let g=gaps();
-if(g.length<3) return "Belum cukup data";
+if(g.length<3) return 0;
 
-let recent=g.slice(-3);
-let avgRecent=recent.reduce((a,b)=>a+b)/recent.length;
-let avgAll=avgCycle();
+let last=g.slice(-3);
+let avgRecent=last.reduce((a,b)=>a+b)/last.length;
+let avgAll=g.reduce((a,b)=>a+b)/g.length;
 
-if(avgRecent>avgAll+1) return "Siklus cenderung memanjang";
-if(avgRecent<avgAll-1) return "Siklus cenderung memendek";
-return "Siklus stabil";
+return avgRecent-avgAll;
+}
+
+function predictedCycle(){
+let base=weightedCycle();
+if(!base) return null;
+
+return Math.round(base+trendAdjust()*0.5);
+}
+
+function confidence(){
+let g=gaps();
+if(!g.length) return "";
+
+let avg=predictedCycle();
+let variance=g.reduce((s,x)=>s+Math.abs(x-avg),0)/g.length;
+
+if(variance<2) return "Tinggi";
+if(variance<5) return "Sedang";
+return "Rendah";
 }
 
 function nextDate(){
-let avg=adaptiveCycle();
+let avg=predictedCycle();
 if(!avg) return null;
 
 let last=new Date(getData().at(-1));
@@ -232,25 +249,13 @@ return "Fase aman";
 
 // ---------- DASHBOARD ----------
 function dashboard(){
-let avg=adaptiveCycle();
-let t=trend();
-
+let avg=predictedCycle();
 if(!avg) return "Tambahkan data untuk analisis.";
 
 return `
-Rata adaptif: ${avg} hari<br>
-Trend: ${t}
+Prediksi AI: ${avg} hari<br>
+Confidence: ${confidence()}
 `;
-}
-
-// ---------- INSIGHT ----------
-function insight(){
-let avg=avgCycle();
-if(!avg) return "";
-
-if(avg<24) return "Siklus relatif pendek.";
-if(avg>35) return "Siklus relatif panjang.";
-return "Siklus dalam rentang normal.";
 }
 
 // ---------- CALENDAR ----------
@@ -258,19 +263,42 @@ function renderCalendar(){
 let cal=document.getElementById("calendar");
 cal.innerHTML="";
 
+let days=["Sen","Sel","Rab","Kam","Jum","Sab","Min"];
+days.forEach(d=>{
+let h=document.createElement("div");
+h.className="header";
+h.innerText=d;
+cal.appendChild(h);
+});
+
 let now=new Date();
-let days=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+let y=now.getFullYear();
+let m=now.getMonth();
+
+let first=new Date(y,m,1).getDay();
+first=(first+6)%7;
+
+for(let i=0;i<first;i++){
+cal.appendChild(document.createElement("div"));
+}
+
+let total=new Date(y,m+1,0).getDate();
 
 let marks=getData().map(d=>new Date(d).getDate());
 let next=nextDate();
 
-for(let i=1;i<=days;i++){
+let fertileStart=next?next.getDate()-14:null;
+
+for(let i=1;i<=total;i++){
 let div=document.createElement("div");
 div.className="day";
 div.innerText=i;
 
 if(marks.includes(i)) div.classList.add("period");
 if(next && next.getDate()==i) div.classList.add("predicted");
+
+if(fertileStart && i>=fertileStart && i<fertileStart+5)
+div.classList.add("fertile");
 
 cal.appendChild(div);
 }
@@ -303,11 +331,9 @@ ctx.stroke();
 
 // ---------- RENDER ----------
 function render(){
-let avg=adaptiveCycle();
 let next=nextDate();
 
 document.getElementById("dashboard").innerHTML=dashboard();
-document.getElementById("insight").innerText=insight();
 
 document.getElementById("prediction").innerText=
 next?next.toLocaleDateString():"Belum cukup data";
@@ -315,7 +341,7 @@ next?next.toLocaleDateString():"Belum cukup data";
 document.getElementById("phase").innerText=phase();
 
 document.getElementById("stats").innerText=
-avg?`Prediksi adaptif: ${avg} hari`:"";
+predictedCycle()?`Confidence: ${confidence()}`:"";
 
 renderCalendar();
 drawChart();
