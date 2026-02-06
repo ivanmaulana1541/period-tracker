@@ -60,21 +60,6 @@ text-align:center;
 .small{font-size:14px;color:#666;}
 .dark .small{color:#aaa;}
 
-.lock{
-position:fixed;
-inset:0;
-background:#0008;
-display:flex;
-justify-content:center;
-align-items:center;
-}
-
-.lockbox{
-background:white;
-padding:20px;
-border-radius:10px;
-}
-
 canvas{width:100%}
 </style>
 </head>
@@ -83,33 +68,26 @@ canvas{width:100%}
 
 <h1>🌙 Luna Period Tracker</h1>
 
-<div id="lock" class="lock" style="display:none">
-<div class="lockbox">
-<h3>🔒 PIN</h3>
-<input type="password" id="pinInput">
-<button onclick="unlock()">Unlock</button>
-</div>
-</div>
-
 <div class="card">
 <select id="profile"></select>
 <button onclick="newProfile()">+ Profile</button>
 <button class="secondary" onclick="toggleDark()">Dark Mode</button>
-<button class="secondary" onclick="exportData()">Export</button>
-<button class="secondary" onclick="importData()">Import</button>
-<button class="secondary" onclick="setPin()">Set PIN</button>
 </div>
 
 <div class="card">
 <input type="date" id="date">
 <button onclick="add()">Tambah Periode</button>
-<button onclick="notifyTest()">Test Reminder</button>
+</div>
+
+<div class="card">
+<h3>Insight Siklus</h3>
+<div id="insight"></div>
 </div>
 
 <div class="card">
 <h3>Prediksi berikutnya</h3>
 <div id="prediction"></div>
-<div id="countdown" class="small"></div>
+<div id="phase" class="small"></div>
 </div>
 
 <div class="card">
@@ -125,7 +103,7 @@ canvas{width:100%}
 
 <script>
 
-// ---------- DARK MODE ----------
+// DARK MODE
 if(localStorage.getItem("dark")==="1")
 document.body.classList.add("dark");
 
@@ -135,22 +113,7 @@ localStorage.setItem("dark",
 document.body.classList.contains("dark")?"1":"0");
 }
 
-// ---------- PIN LOCK ----------
-function setPin(){
-let pin=prompt("Set PIN (4 digit)");
-if(pin) localStorage.setItem("lunaPin",pin);
-}
-
-function unlock(){
-let pin=document.getElementById("pinInput").value;
-if(pin===localStorage.getItem("lunaPin"))
-document.getElementById("lock").style.display="none";
-}
-
-if(localStorage.getItem("lunaPin"))
-document.getElementById("lock").style.display="flex";
-
-// ---------- PROFILE ----------
+// PROFILE
 let profiles=JSON.parse(localStorage.getItem("lunaProfiles"))||{Default:[]};
 let current="Default";
 
@@ -182,7 +145,7 @@ saveProfiles();
 refreshProfiles();
 }
 
-// ---------- DATA ----------
+// DATA
 function getData(){return profiles[current];}
 
 function add(){
@@ -194,19 +157,29 @@ saveProfiles();
 render();
 }
 
-// ---------- CALC ----------
-function avgCycle(){
+// CALC
+function gaps(){
 let d=getData();
-if(d.length<2) return null;
-
 let g=[];
 for(let i=1;i<d.length;i++){
 let a=new Date(d[i-1]);
 let b=new Date(d[i]);
 g.push((b-a)/86400000);
 }
+return g;
+}
 
+function avgCycle(){
+let g=gaps();
+if(!g.length) return null;
 return Math.round(g.reduce((a,b)=>a+b)/g.length);
+}
+
+function variation(){
+let g=gaps();
+if(!g.length) return 0;
+let avg=avgCycle();
+return Math.round(g.reduce((s,x)=>s+Math.abs(x-avg),0)/g.length);
 }
 
 function nextDate(){
@@ -217,29 +190,34 @@ last.setDate(last.getDate()+avg);
 return last;
 }
 
-// ---------- REMINDER ----------
-function notifyTest(){
-Notification.requestPermission().then(()=>{
-new Notification("🌙 Luna Reminder","Periode akan datang!");
-});
+// INSIGHT
+function insight(){
+let avg=avgCycle();
+let varr=variation();
+
+if(!avg) return "Belum cukup data";
+
+let reg=varr<=2?"Siklus sangat stabil":
+varr<=5?"Siklus cukup stabil":
+"Siklus tidak teratur";
+
+return `${reg} • rata-rata ${avg} hari`;
 }
 
-function checkReminder(){
-let n=nextDate();
-if(!n) return;
+// PHASE
+function phase(){
+let next=nextDate();
+if(!next) return "";
 
-let diff=Math.ceil((n-new Date())/86400000);
+let today=new Date();
+let diff=Math.ceil((next-today)/86400000);
 
-if(diff===1){
-Notification.requestPermission().then(()=>{
-new Notification("🌙 Luna Reminder","Besok perkiraan periode!");
-});
+if(diff<=5 && diff>=0) return "Fase periode mendekat";
+if(diff>5 && diff<=14) return "Fase subur";
+return "Fase aman";
 }
-}
 
-setInterval(checkReminder,3600000);
-
-// ---------- UI ----------
+// CALENDAR
 function renderCalendar(){
 let cal=document.getElementById("calendar");
 cal.innerHTML="";
@@ -262,63 +240,32 @@ cal.appendChild(div);
 }
 }
 
+// CHART
 function drawChart(){
 let canvas=document.getElementById("chart");
 let ctx=canvas.getContext("2d");
 canvas.height=120;
 ctx.clearRect(0,0,canvas.width,canvas.height);
 
-let d=getData();
-if(d.length<2) return;
+let g=gaps();
+if(!g.length) return;
 
-let gaps=[];
-for(let i=1;i<d.length;i++){
-let a=new Date(d[i-1]);
-let b=new Date(d[i]);
-gaps.push((b-a)/86400000);
-}
-
-let max=Math.max(...gaps);
-let w=canvas.width/gaps.length;
+let max=Math.max(...g);
+let w=canvas.width/g.length;
 
 ctx.strokeStyle="#ff4d88";
 ctx.beginPath();
 
-gaps.forEach((g,i)=>{
-let x=i*w;
-let y=120-(g/max)*100;
-ctx.lineTo(x,y);
+g.forEach((x,i)=>{
+let px=i*w;
+let py=120-(x/max)*100;
+ctx.lineTo(px,py);
 });
 
 ctx.stroke();
 }
 
-// ---------- EXPORT / IMPORT ----------
-function exportData(){
-let blob=new Blob([JSON.stringify(profiles)],{type:"application/json"});
-let a=document.createElement("a");
-a.href=URL.createObjectURL(blob);
-a.download="luna-backup.json";
-a.click();
-}
-
-function importData(){
-let input=document.createElement("input");
-input.type="file";
-input.onchange=e=>{
-let reader=new FileReader();
-reader.onload=()=>{
-profiles=JSON.parse(reader.result);
-saveProfiles();
-refreshProfiles();
-render();
-};
-reader.readAsText(e.target.files[0]);
-};
-input.click();
-}
-
-// ---------- RENDER ----------
+// RENDER
 function render(){
 let avg=avgCycle();
 let next=nextDate();
@@ -326,17 +273,18 @@ let next=nextDate();
 document.getElementById("prediction").innerText=
 next?next.toLocaleDateString():"Belum cukup data";
 
-document.getElementById("countdown").innerText=
-next?Math.ceil((next-new Date())/86400000)+" hari lagi":"";
+document.getElementById("phase").innerText=phase();
 
 document.getElementById("stats").innerText=
-avg?`Rata-rata siklus: ${avg} hari`:"";
+avg?`Rata-rata siklus: ${avg} hari • variasi ±${variation()} hari`:"";
+
+document.getElementById("insight").innerText=insight();
 
 renderCalendar();
 drawChart();
 }
 
-// ---------- INIT ----------
+// INIT
 refreshProfiles();
 render();
 
