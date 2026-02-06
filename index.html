@@ -12,12 +12,20 @@ background:#fff5f8;
 padding:20px;
 max-width:520px;
 margin:auto;
+transition:.3s;
+}
+
+.dark{
+background:#1f1f1f;
+color:white;
 }
 
 h1{
 text-align:center;
 color:#d63384;
 }
+
+.dark h1{color:#ff8fb3}
 
 .card{
 background:white;
@@ -26,6 +34,11 @@ border-radius:12px;
 box-shadow:0 3px 8px rgba(0,0,0,0.1);
 margin-bottom:15px;
 animation:fade .4s ease;
+transition:.3s;
+}
+
+.dark .card{
+background:#2b2b2b;
 }
 
 @keyframes fade{
@@ -45,8 +58,8 @@ font-size:16px;
 cursor:pointer;
 }
 
-button:active{
-transform:scale(.98);
+button.secondary{
+background:#999;
 }
 
 input{
@@ -55,6 +68,28 @@ padding:10px;
 border-radius:8px;
 border:1px solid #ddd;
 }
+
+.calendar{
+display:grid;
+grid-template-columns:repeat(7,1fr);
+gap:4px;
+text-align:center;
+}
+
+.day{
+padding:6px;
+border-radius:6px;
+background:#f0f0f0;
+font-size:14px;
+}
+
+.dark .day{
+background:#3a3a3a;
+}
+
+.period{background:#ffb3c9}
+.ovulation{background:#9be7ff}
+.predicted{background:#ffc4e1}
 
 li{
 display:flex;
@@ -68,33 +103,9 @@ font-size:14px;
 color:#666;
 }
 
-.calendar{
-display:grid;
-grid-template-columns:repeat(7,1fr);
-gap:4px;
-text-align:center;
-}
+.dark .small{color:#aaa}
 
-.day{
-padding:6px;
-border-radius:6px;
-background:#f7f7f7;
-font-size:14px;
-}
-
-.period{
-background:#ffb3c9;
-font-weight:bold;
-}
-
-.highlight{
-background:#ff4d88;
-color:white;
-}
-
-canvas{
-width:100%;
-}
+canvas{width:100%}
 </style>
 </head>
 
@@ -105,7 +116,9 @@ width:100%;
 <div class="card">
 <input type="date" id="date">
 <button onclick="add()">Simpan Tanggal</button>
-<button onclick="resetData()" style="background:#999">Reset Data</button>
+<button class="secondary" onclick="resetData()">Reset</button>
+<button class="secondary" onclick="toggleDark()">Dark Mode</button>
+<button class="secondary" onclick="exportData()">Export Data</button>
 </div>
 
 <div class="card">
@@ -122,7 +135,7 @@ width:100%;
 
 <div class="card">
 <h3>Kalender bulan ini</h3>
-<div class="calendar" id="calendar"></div>
+<div id="calendar" class="calendar"></div>
 </div>
 
 <div class="card">
@@ -145,7 +158,7 @@ function add(){
 let date=document.getElementById("date").value;
 if(!date) return;
 
-let mood=prompt("Mood hari ini? 😊😴😡❤️","");
+let mood=prompt("Mood hari ini? 😊","");
 data.push({date,mood});
 data.sort((a,b)=>new Date(a.date)-new Date(b.date));
 
@@ -180,15 +193,14 @@ if(!avg) return null;
 
 let last=new Date(data[data.length-1].date);
 last.setDate(last.getDate()+avg);
-
 return last;
 }
 
-function predict(){
+function ovulationDate(){
 let next=nextDate();
-if(!next) return "Belum cukup data";
-
-return next.toLocaleDateString();
+if(!next) return null;
+next.setDate(next.getDate()-14);
+return next;
 }
 
 function countdown(){
@@ -196,7 +208,6 @@ let next=nextDate();
 if(!next) return "";
 
 let diff=Math.ceil((next-new Date())/(1000*60*60*24));
-
 return diff>0?`${diff} hari lagi`: "Hari ini!";
 }
 
@@ -206,14 +217,11 @@ list.innerHTML="";
 
 data.slice().reverse().forEach(item=>{
 let li=document.createElement("li");
-
 li.innerHTML=`
 <div>
 ${new Date(item.date).toLocaleDateString()}
 <div class="small">${item.mood||""}</div>
-</div>
-`;
-
+</div>`;
 list.appendChild(li);
 });
 }
@@ -225,10 +233,12 @@ cal.innerHTML="";
 let now=new Date();
 let year=now.getFullYear();
 let month=now.getMonth();
-
 let days=new Date(year,month+1,0).getDate();
 
 let periodDays=data.map(d=>new Date(d.date).getDate());
+
+let next=nextDate();
+let ovu=ovulationDate();
 
 for(let i=1;i<=days;i++){
 let div=document.createElement("div");
@@ -236,6 +246,10 @@ div.className="day";
 div.innerText=i;
 
 if(periodDays.includes(i)) div.classList.add("period");
+
+if(next && next.getDate()==i) div.classList.add("predicted");
+
+if(ovu && ovu.getDate()==i) div.classList.add("ovulation");
 
 cal.appendChild(div);
 }
@@ -245,7 +259,6 @@ function drawChart(){
 let canvas=document.getElementById("chart");
 let ctx=canvas.getContext("2d");
 canvas.height=120;
-
 ctx.clearRect(0,0,canvas.width,canvas.height);
 
 if(data.length<2) return;
@@ -272,15 +285,30 @@ ctx.lineTo(x,y);
 ctx.stroke();
 }
 
+function exportData(){
+let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download="luna-data.json";
+a.click();
+}
+
+function toggleDark(){
+document.body.classList.toggle("dark");
+}
+
 function render(){
 renderHistory();
 renderCalendar();
 drawChart();
 
-document.getElementById("prediction").innerText=predict();
+let avg=avgCycle();
+
+document.getElementById("prediction").innerText=
+nextDate()?nextDate().toLocaleDateString():"Belum cukup data";
+
 document.getElementById("countdown").innerText=countdown();
 
-let avg=avgCycle();
 document.getElementById("stats").innerText=
 avg?`Rata-rata siklus: ${avg} hari`:"Belum cukup data";
 }
