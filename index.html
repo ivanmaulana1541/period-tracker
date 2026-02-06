@@ -26,16 +26,10 @@ padding:15px;
 border-radius:12px;
 box-shadow:0 3px 8px rgba(0,0,0,0.1);
 margin-bottom:15px;
-animation:fade .4s ease;
 transition:.3s;
 }
 
 .dark .card{background:#2b2b2b;}
-
-@keyframes fade{
-from{opacity:0;transform:translateY(10px)}
-to{opacity:1}
-}
 
 button{
 background:#ff4d88;
@@ -57,12 +51,7 @@ gap:4px;
 text-align:center;
 }
 
-.day{
-padding:6px;
-border-radius:6px;
-background:#f0f0f0;
-}
-
+.day{padding:6px;border-radius:6px;background:#f0f0f0;}
 .dark .day{background:#3a3a3a;}
 
 .period{background:#ffb3c9;}
@@ -70,6 +59,21 @@ background:#f0f0f0;
 
 .small{font-size:14px;color:#666;}
 .dark .small{color:#aaa;}
+
+.lock{
+position:fixed;
+inset:0;
+background:#0008;
+display:flex;
+justify-content:center;
+align-items:center;
+}
+
+.lockbox{
+background:white;
+padding:20px;
+border-radius:10px;
+}
 
 canvas{width:100%}
 </style>
@@ -79,17 +83,27 @@ canvas{width:100%}
 
 <h1>🌙 Luna Period Tracker</h1>
 
+<div id="lock" class="lock" style="display:none">
+<div class="lockbox">
+<h3>🔒 PIN</h3>
+<input type="password" id="pinInput">
+<button onclick="unlock()">Unlock</button>
+</div>
+</div>
+
 <div class="card">
 <select id="profile"></select>
 <button onclick="newProfile()">+ Profile</button>
 <button class="secondary" onclick="toggleDark()">Dark Mode</button>
 <button class="secondary" onclick="exportData()">Export</button>
 <button class="secondary" onclick="importData()">Import</button>
+<button class="secondary" onclick="setPin()">Set PIN</button>
 </div>
 
 <div class="card">
 <input type="date" id="date">
 <button onclick="add()">Tambah Periode</button>
+<button onclick="notifyTest()">Test Reminder</button>
 </div>
 
 <div class="card">
@@ -121,8 +135,23 @@ localStorage.setItem("dark",
 document.body.classList.contains("dark")?"1":"0");
 }
 
-// ---------- PROFILE SYSTEM ----------
-let profiles = JSON.parse(localStorage.getItem("lunaProfiles")) || {Default:[]};
+// ---------- PIN LOCK ----------
+function setPin(){
+let pin=prompt("Set PIN (4 digit)");
+if(pin) localStorage.setItem("lunaPin",pin);
+}
+
+function unlock(){
+let pin=document.getElementById("pinInput").value;
+if(pin===localStorage.getItem("lunaPin"))
+document.getElementById("lock").style.display="none";
+}
+
+if(localStorage.getItem("lunaPin"))
+document.getElementById("lock").style.display="flex";
+
+// ---------- PROFILE ----------
+let profiles=JSON.parse(localStorage.getItem("lunaProfiles"))||{Default:[]};
 let current="Default";
 
 function saveProfiles(){
@@ -133,9 +162,9 @@ function refreshProfiles(){
 let sel=document.getElementById("profile");
 sel.innerHTML="";
 Object.keys(profiles).forEach(p=>{
-let opt=document.createElement("option");
-opt.textContent=p;
-sel.appendChild(opt);
+let o=document.createElement("option");
+o.textContent=p;
+sel.appendChild(o);
 });
 sel.value=current;
 }
@@ -146,9 +175,9 @@ render();
 };
 
 function newProfile(){
-let name=prompt("Nama profile?");
-if(!name) return;
-profiles[name]=[];
+let n=prompt("Nama profile?");
+if(!n) return;
+profiles[n]=[];
 saveProfiles();
 refreshProfiles();
 }
@@ -157,38 +186,58 @@ refreshProfiles();
 function getData(){return profiles[current];}
 
 function add(){
-let date=document.getElementById("date").value;
-if(!date) return;
-
-profiles[current].push(date);
+let d=document.getElementById("date").value;
+if(!d) return;
+profiles[current].push(d);
 profiles[current].sort();
 saveProfiles();
 render();
 }
 
-// ---------- CALCULATIONS ----------
+// ---------- CALC ----------
 function avgCycle(){
 let d=getData();
 if(d.length<2) return null;
 
-let gaps=[];
+let g=[];
 for(let i=1;i<d.length;i++){
 let a=new Date(d[i-1]);
 let b=new Date(d[i]);
-gaps.push((b-a)/86400000);
+g.push((b-a)/86400000);
 }
 
-return Math.round(gaps.reduce((a,b)=>a+b)/gaps.length);
+return Math.round(g.reduce((a,b)=>a+b)/g.length);
 }
 
 function nextDate(){
 let avg=avgCycle();
 if(!avg) return null;
-
 let last=new Date(getData().at(-1));
 last.setDate(last.getDate()+avg);
 return last;
 }
+
+// ---------- REMINDER ----------
+function notifyTest(){
+Notification.requestPermission().then(()=>{
+new Notification("🌙 Luna Reminder","Periode akan datang!");
+});
+}
+
+function checkReminder(){
+let n=nextDate();
+if(!n) return;
+
+let diff=Math.ceil((n-new Date())/86400000);
+
+if(diff===1){
+Notification.requestPermission().then(()=>{
+new Notification("🌙 Luna Reminder","Besok perkiraan periode!");
+});
+}
+}
+
+setInterval(checkReminder,3600000);
 
 // ---------- UI ----------
 function renderCalendar(){
