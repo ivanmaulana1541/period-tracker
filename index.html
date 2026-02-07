@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>🌙 Luna Period Tracker</title>
+<title>🌙 Luna Premium Tracker</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="manifest" href="manifest.json">
 
 <style>
 body{
@@ -15,10 +14,7 @@ margin:auto;
 transition:.3s;
 }
 
-.dark{
-background:#1f1f1f;
-color:white;
-}
+.dark{background:#1f1f1f;color:white;}
 
 h1{text-align:center;color:#d63384;}
 .dark h1{color:#ff8fb3;}
@@ -27,19 +23,11 @@ h1{text-align:center;color:#d63384;}
 background:white;
 padding:15px;
 border-radius:12px;
-box-shadow:0 3px 8px rgba(0,0,0,0.1);
+box-shadow:0 3px 8px rgba(0,0,0,.1);
 margin-bottom:15px;
-animation:fade .4s ease;
 }
 
-.dark .card{
-background:#2b2b2b;
-}
-
-@keyframes fade{
-from{opacity:0;transform:translateY(10px);}
-to{opacity:1;}
-}
+.dark .card{background:#2b2b2b;}
 
 button{
 background:#ff4d88;
@@ -49,13 +37,12 @@ padding:10px;
 border-radius:8px;
 width:100%;
 margin-top:8px;
-font-size:16px;
 cursor:pointer;
 }
 
 .secondary{background:#777;}
 
-input{
+input,select{
 width:100%;
 padding:10px;
 border-radius:8px;
@@ -65,11 +52,22 @@ border:1px solid #ddd;
 .small{font-size:14px;color:#666;}
 .dark .small{color:#aaa;}
 
-#calendarNav{
-display:flex;
-justify-content:space-between;
-align-items:center;
-margin-bottom:10px;
+.dashboard{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:8px;
+}
+
+.metric{
+background:#ffe3ef;
+padding:10px;
+border-radius:8px;
+text-align:center;
+font-weight:bold;
+}
+
+.dark .metric{
+background:#333;
 }
 
 #calendar{
@@ -83,18 +81,13 @@ padding:8px;
 text-align:center;
 border-radius:8px;
 background:#f5f5f5;
-font-size:14px;
 position:relative;
 }
 
 .dark .day{background:#3a3a3a;}
 
-.today{outline:2px solid #333;}
-
 .period{background:#ff4d88;color:white;}
-
 .prediction{background:#6c5ce7;color:white;}
-
 .ovulation{background:#00b894;color:white;}
 
 .mood{
@@ -103,162 +96,203 @@ bottom:2px;
 right:2px;
 font-size:12px;
 }
+
+canvas{
+width:100%;
+border-radius:10px;
+background:#fff;
+}
+
+.dark canvas{background:#333;}
 </style>
 </head>
 
 <body>
 
-<h1>🌙 Luna Period Tracker</h1>
+<h1>🌙 Luna Premium</h1>
+
+<div class="card">
+<select id="profile"></select>
+<button onclick="newProfile()">+ Profile</button>
+<button class="secondary" onclick="toggleDark()">Dark Mode</button>
+<button class="secondary" onclick="resetAll()">Reset</button>
+</div>
 
 <div class="card">
 <input type="date" id="date">
-<button onclick="add()">Simpan Tanggal + Mood</button>
-<button class="secondary" onclick="resetAll()">Reset Data</button>
-<button class="secondary" onclick="toggleDark()">🌗 Dark Mode</button>
+<button onclick="add()">Tambah + Mood</button>
 </div>
 
 <div class="card">
-<h3>AI Prediction</h3>
-<div id="prediction">Belum ada data</div>
+<h3>Premium Dashboard</h3>
+<div class="dashboard">
+<div class="metric" id="mAvg">-</div>
+<div class="metric" id="mTrend">-</div>
+<div class="metric" id="mStability">-</div>
+<div class="metric" id="mNext">-</div>
+</div>
+<p class="small" id="insight"></p>
 </div>
 
 <div class="card">
-<h3>Statistik AI</h3>
-<div id="stats" class="small"></div>
-<canvas id="chart" height="120"></canvas>
+<h3>Grafik Siklus</h3>
+<canvas id="chart" height="150"></canvas>
+<div id="chartInfo" class="small"></div>
 </div>
 
 <div class="card">
-<h3>Kalender Profesional</h3>
-
-<div id="calendarNav">
-<button onclick="changeMonth(-1)">◀</button>
-<b id="monthLabel"></b>
-<button onclick="changeMonth(1)">▶</button>
-</div>
-
+<h3>Kalender</h3>
 <div id="calendar"></div>
-</div>
-
-<div class="card">
-<h3>Riwayat</h3>
-<ul id="history"></ul>
 </div>
 
 <script>
 
 // DARK MODE
-if(localStorage.getItem("dark")==="1")
+if(localStorage.dark==="1")
 document.body.classList.add("dark");
 
 function toggleDark(){
 document.body.classList.toggle("dark");
-localStorage.setItem("dark",
-document.body.classList.contains("dark")?"1":"0");
+localStorage.dark=document.body.classList.contains("dark")?"1":"0";
+}
+
+// PROFILE
+let profiles=JSON.parse(localStorage.lunaProfiles||"{}");
+if(!profiles.Default) profiles.Default=[];
+let current="Default";
+
+function saveProfiles(){
+localStorage.lunaProfiles=JSON.stringify(profiles);
+}
+
+function refreshProfiles(){
+let sel=document.getElementById("profile");
+sel.innerHTML="";
+Object.keys(profiles).forEach(p=>{
+let o=document.createElement("option");
+o.textContent=p;
+sel.appendChild(o);
+});
+sel.value=current;
+}
+
+document.getElementById("profile").onchange=e=>{
+current=e.target.value;
+render();
+};
+
+function newProfile(){
+let n=prompt("Nama profile?");
+if(!n)return;
+profiles[n]=[];
+saveProfiles();
+refreshProfiles();
 }
 
 // DATA
-let data=JSON.parse(localStorage.getItem("luna")||"[]");
-let current=new Date();
-
-function save(){
-localStorage.setItem("luna",JSON.stringify(data));
-}
+function getData(){return profiles[current];}
 
 function add(){
-let date=document.getElementById("date").value;
-if(!date)return;
+let d=document.getElementById("date").value;
+if(!d)return;
 
-let mood=prompt("Mood hari ini? 😊😴😡❤️","");
-data.push({date,mood});
-data.sort((a,b)=>a.date.localeCompare(b.date));
-save();
+let mood=prompt("Mood hari ini? 😊","");
+getData().push({date:d,mood});
+getData().sort((a,b)=>a.date.localeCompare(b.date));
+saveProfiles();
 render();
 }
 
 function resetAll(){
-if(confirm("Hapus semua data?")){
-data=[];
-save();
+if(confirm("Reset data profile ini?")){
+profiles[current]=[];
+saveProfiles();
 render();
 }
 }
 
-// AI LEARNING
+// AI ANALYSIS
 function analyze(){
-if(data.length<2) return {avg:0,conf:"rendah",gaps:[]};
+let arr=getData();
+if(arr.length<2) return null;
 
 let gaps=[];
-for(let i=1;i<data.length;i++){
-let a=new Date(data[i-1].date);
-let b=new Date(data[i].date);
+for(let i=1;i<arr.length;i++){
+let a=new Date(arr[i-1].date);
+let b=new Date(arr[i].date);
 gaps.push((b-a)/86400000);
 }
 
-// weighted learning
-let total=0,weight=0;
-gaps.forEach((v,i)=>{
-let w=i+1;
-total+=v*w;
-weight+=w;
-});
+let avg=gaps.reduce((a,b)=>a+b)/gaps.length;
 
-let avg=total/weight;
+let variance=gaps.map(x=>(x-avg)**2)
+.reduce((a,b)=>a+b)/gaps.length;
 
-let variance=gaps.map(g=>(g-avg)**2)
-.reduce((a,b)=>a+b,0)/gaps.length;
+let stability=
+variance<4?"Stabil":
+variance<9?"Cukup":"Variatif";
 
-let conf=variance<4?"tinggi":
-variance<9?"sedang":"rendah";
+let trend="Stabil";
+if(gaps.length>=3){
+let recent=gaps.slice(-3)
+.reduce((a,b)=>a+b)/3;
 
-return {avg,conf,gaps};
+if(recent>avg+1)trend="Memanjang";
+if(recent<avg-1)trend="Memendek";
 }
 
-function drawChart(arr){
+return {avg,variance,gaps,stability,trend};
+}
+
+// GRAPH
+function drawChart(gaps){
 let c=document.getElementById("chart");
 let ctx=c.getContext("2d");
 ctx.clearRect(0,0,c.width,c.height);
 
-if(!arr.length)return;
+if(!gaps||!gaps.length)return;
 
-let max=Math.max(...arr)+2;
-let step=c.width/(arr.length+1);
+let max=Math.max(...gaps)+2;
+let step=c.width/(gaps.length+1);
 
 ctx.strokeStyle="#ff4d88";
 ctx.lineWidth=3;
 ctx.beginPath();
 
-arr.forEach((v,i)=>{
+gaps.forEach((v,i)=>{
 let x=step*(i+1);
 let y=c.height-(v/max)*c.height;
+
 if(i===0)ctx.moveTo(x,y);
 else ctx.lineTo(x,y);
 });
 
 ctx.stroke();
+
+c.onclick=e=>{
+let i=Math.floor(e.offsetX/step)-1;
+if(gaps[i])
+document.getElementById("chartInfo")
+.innerText="Interval: "+Math.round(gaps[i])+" hari";
+};
 }
 
 // CALENDAR
-function buildCalendar(){
+function buildCalendar(avg){
 let cal=document.getElementById("calendar");
 cal.innerHTML="";
 
-let y=current.getFullYear();
-let m=current.getMonth();
-
-document.getElementById("monthLabel").innerText=
-current.toLocaleString("default",{month:"long",year:"numeric"});
-
-let days=new Date(y,m+1,0).getDate();
 let today=new Date();
+let y=today.getFullYear();
+let m=today.getMonth();
+let days=new Date(y,m+1,0).getDate();
 
-let a=analyze();
-let avg=Math.round(a.avg);
+let arr=getData();
 
 let predicted=null,ovu=null;
 
-if(data.length && avg){
-predicted=new Date(data[data.length-1].date);
+if(arr.length&&avg){
+predicted=new Date(arr.at(-1).date);
 predicted.setDate(predicted.getDate()+avg);
 
 ovu=new Date(predicted);
@@ -273,80 +307,66 @@ cell.textContent=d;
 let date=new Date(y,m,d);
 let iso=date.toISOString().split("T")[0];
 
-if(date.toDateString()===today.toDateString())
-cell.classList.add("today");
+let rec=arr.find(x=>x.date===iso);
 
-let record=data.find(x=>x.date===iso);
-
-if(record){
+if(rec){
 cell.classList.add("period");
-if(record.mood){
-let mood=document.createElement("div");
-mood.className="mood";
-mood.textContent=record.mood;
-cell.appendChild(mood);
+if(rec.mood){
+let m=document.createElement("div");
+m.className="mood";
+m.textContent=rec.mood;
+cell.appendChild(m);
 }
 }
 
-if(predicted &&
-date.toDateString()===predicted.toDateString())
+if(predicted&&date.toDateString()===predicted.toDateString())
 cell.classList.add("prediction");
 
-if(ovu &&
-date.toDateString()===ovu.toDateString())
+if(ovu&&date.toDateString()===ovu.toDateString())
 cell.classList.add("ovulation");
 
 cal.appendChild(cell);
 }
 }
 
-function changeMonth(n){
-current.setMonth(current.getMonth()+n);
-buildCalendar();
-}
-
 // RENDER
 function render(){
-let list=document.getElementById("history");
-list.innerHTML="";
-
-data.forEach(d=>{
-let li=document.createElement("li");
-li.textContent=d.date+" "+(d.mood||"");
-list.appendChild(li);
-});
-
 let a=analyze();
 
-if(a.avg){
-let next=new Date(data[data.length-1].date);
+if(a){
+let next=new Date(getData().at(-1).date);
 next.setDate(next.getDate()+Math.round(a.avg));
 
-let ovu=new Date(next);
-ovu.setDate(next.getDate()-14);
+document.getElementById("mAvg").innerText=
+"Avg: "+Math.round(a.avg)+" hari";
 
-document.getElementById("prediction").innerHTML=
-"Next period: <b>"+next.toDateString()+"</b><br>"+
-"Ovulation: <b>"+ovu.toDateString()+"</b>";
+document.getElementById("mTrend").innerText=
+"Trend: "+a.trend;
 
-document.getElementById("stats").innerHTML=
-"AI avg cycle: "+Math.round(a.avg)+" hari<br>"+
-"Confidence: "+a.conf;
+document.getElementById("mStability").innerText=
+"Stabilitas: "+a.stability;
+
+document.getElementById("mNext").innerText=
+"Next: "+next.toLocaleDateString();
+
+document.getElementById("insight").innerText=
+"Siklus "+a.stability+
+" dengan tren "+a.trend+
+". Pantau kesehatan secara rutin.";
 
 drawChart(a.gaps);
-}else{
-document.getElementById("stats").innerText=
-"Tambahkan minimal 2 data.";
+buildCalendar(Math.round(a.avg));
 }
-
+else{
+document.getElementById("insight").innerText=
+"Tambahkan minimal 2 data.";
 buildCalendar();
 }
-
-render();
-
-if("serviceWorker" in navigator){
-navigator.serviceWorker.register("service-worker.js");
 }
+
+// INIT
+refreshProfiles();
+render();
 
 </script>
 
