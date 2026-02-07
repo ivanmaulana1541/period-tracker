@@ -10,15 +10,14 @@ body{
 font-family:system-ui;
 background:#fff5f8;
 padding:20px;
-max-width:560px;
+max-width:500px;
 margin:auto;
-transition:.3s;
 }
 
-.dark{background:#1f1f1f;color:white;}
-
-h1{text-align:center;color:#d63384;}
-.dark h1{color:#ff8fb3;}
+h1{
+color:#d63384;
+text-align:center;
+}
 
 .card{
 background:white;
@@ -26,53 +25,76 @@ padding:15px;
 border-radius:12px;
 box-shadow:0 3px 8px rgba(0,0,0,0.1);
 margin-bottom:15px;
-transition:.3s;
+animation:fade .4s ease;
 }
 
-.dark .card{background:#2b2b2b;}
+@keyframes fade{
+from{opacity:0;transform:translateY(10px);}
+to{opacity:1;}
+}
 
 button{
 background:#ff4d88;
 color:white;
 border:none;
-padding:12px;
+padding:10px;
 border-radius:8px;
 width:100%;
 margin-top:8px;
+font-size:16px;
 cursor:pointer;
 }
 
-.secondary{background:#999;}
-
-.calendar{
-display:grid;
-grid-template-columns:repeat(7,1fr);
-gap:4px;
-text-align:center;
+button.secondary{
+background:#999;
 }
 
-.header{
-font-weight:bold;
-font-size:13px;
-opacity:.7;
+input{
+width:100%;
+padding:10px;
+border-radius:8px;
+border:1px solid #ddd;
+}
+
+li{
+display:flex;
+justify-content:space-between;
+padding:8px 0;
+border-bottom:1px solid #eee;
+}
+
+.small{
+font-size:14px;
+color:#666;
+}
+
+/* kalender */
+
+#calendar{
+display:grid;
+grid-template-columns:repeat(7,1fr);
+gap:6px;
+margin-top:10px;
 }
 
 .day{
-padding:8px 0;
-border-radius:6px;
-background:#f0f0f0;
+padding:8px;
+text-align:center;
+border-radius:8px;
+background:#f5f5f5;
+font-size:14px;
 }
 
-.dark .day{background:#3a3a3a;}
+.period{
+background:#ff4d88;
+color:white;
+font-weight:bold;
+}
 
-.period{background:#ffb3c9;}
-.predicted{background:#ffc4e1;}
-.fertile{background:#b8f0ff;}
-
-.small{font-size:14px;color:#666;}
-.dark .small{color:#aaa;}
-
-canvas{width:100%}
+.prediction{
+background:#6c5ce7;
+color:white;
+}
 </style>
 </head>
 
@@ -81,135 +103,93 @@ canvas{width:100%}
 <h1>🌙 Luna Period Tracker</h1>
 
 <div class="card">
-<select id="profile"></select>
-<button onclick="newProfile()">+ Profile</button>
-<button class="secondary" onclick="toggleDark()">Dark Mode</button>
-</div>
-
-<div class="card">
 <input type="date" id="date">
-<button onclick="add()">Tambah Periode</button>
-</div>
-
-<div class="card">
-<h3>AI Dashboard</h3>
-<div id="dashboard"></div>
+<button onclick="add()">Simpan Tanggal</button>
+<button class="secondary" onclick="resetAll()">Reset Data</button>
 </div>
 
 <div class="card">
 <h3>Prediksi berikutnya</h3>
-<div id="prediction"></div>
-<div id="phase" class="small"></div>
-</div>
-
-<div class="card">
-<h3>Kalender Profesional</h3>
-<div id="calendar" class="calendar"></div>
+<div id="prediction">Belum ada data</div>
 </div>
 
 <div class="card">
 <h3>Statistik</h3>
-<div id="stats"></div>
-<canvas id="chart"></canvas>
+<div id="stats" class="small"></div>
+<canvas id="chart" height="120"></canvas>
+</div>
+
+<div class="card">
+<h3>Kalender Siklus</h3>
+<div id="calendar"></div>
+</div>
+
+<div class="card">
+<h3>Riwayat</h3>
+<ul id="history"></ul>
 </div>
 
 <script>
-let data = JSON.parse(localStorage.getItem("lunaData") || "[]");
+let data=JSON.parse(localStorage.getItem("luna")||"[]");
 
 function save(){
-localStorage.setItem("lunaData", JSON.stringify(data));
+localStorage.setItem("luna",JSON.stringify(data));
 }
 
 function add(){
-let val = document.getElementById("date").value;
+let val=document.getElementById("date").value;
 if(!val) return;
-
 data.push(val);
 data.sort();
 save();
-
-document.getElementById("date").value="";
 render();
 }
 
-function resetData(){
-if(confirm("Reset semua data Luna?")){
+function resetAll(){
+if(confirm("Hapus semua data?")){
 data=[];
 save();
 render();
 }
 }
 
-function daysBetween(a,b){
-return Math.round((new Date(b)-new Date(a))/(1000*60*60*24));
-}
-
 function analyze(){
-if(data.length<2){
-return {
-avg:0,
-stability:"Belum cukup data",
-confidence:"Rendah",
-intervals:[]
-};
-}
+if(data.length<2) return {avg:0,conf:"rendah",intervals:[]};
 
-let intervals=[];
+let gaps=[];
 for(let i=1;i<data.length;i++){
-intervals.push(daysBetween(data[i-1],data[i]));
+let a=new Date(data[i-1]);
+let b=new Date(data[i]);
+gaps.push((b-a)/86400000);
 }
 
-let avg = intervals.reduce((a,b)=>a+b)/intervals.length;
+let avg=gaps.reduce((a,b)=>a+b,0)/gaps.length;
+let variance=gaps.map(g=>(g-avg)**2)
+.reduce((a,b)=>a+b,0)/gaps.length;
 
-let variance = intervals
-.map(x=>(x-avg)**2)
-.reduce((a,b)=>a+b)/intervals.length;
+let conf=variance<4?"tinggi":
+variance<9?"sedang":"rendah";
 
-let sd = Math.sqrt(variance);
-
-let stability="Tinggi";
-let confidence="Tinggi";
-
-if(sd>5){
-stability="Rendah";
-confidence="Rendah";
-}
-else if(sd>2){
-stability="Sedang";
-confidence="Sedang";
+return {avg,conf,intervals:gaps};
 }
 
-return {avg,stability,confidence,intervals};
-}
+function drawChart(arr){
+let c=document.getElementById("chart");
+let ctx=c.getContext("2d");
+ctx.clearRect(0,0,c.width,c.height);
 
-function predict(avg){
-if(!data.length || !avg) return "Belum ada prediksi";
+if(!arr.length) return;
 
-let last = new Date(data[data.length-1]);
-last.setDate(last.getDate()+Math.round(avg));
+let max=Math.max(...arr)+2;
+let step=c.width/(arr.length+1);
 
-return last.toLocaleDateString();
-}
-
-function drawChart(intervals){
-let canvas=document.getElementById("chart");
-let ctx=canvas.getContext("2d");
-
-ctx.clearRect(0,0,canvas.width,canvas.height);
-
-if(intervals.length<2) return;
-
-let max=Math.max(...intervals);
-let min=Math.min(...intervals);
-
-ctx.beginPath();
 ctx.strokeStyle="#ff4d88";
 ctx.lineWidth=3;
+ctx.beginPath();
 
-intervals.forEach((v,i)=>{
-let x=(i/(intervals.length-1))*canvas.width;
-let y=canvas.height-((v-min)/(max-min||1))*canvas.height;
-
+arr.forEach((v,i)=>{
+let x=step*(i+1);
+let y=c.height-(v/max)*c.height;
 if(i===0) ctx.moveTo(x,y);
 else ctx.lineTo(x,y);
 });
@@ -217,44 +197,86 @@ else ctx.lineTo(x,y);
 ctx.stroke();
 }
 
-function insight(a){
-if(a.stability==="Tinggi")
-return "✨ Siklus stabil. Prediksi sangat akurat.";
+function buildCalendar(){
+let cal=document.getElementById("calendar");
+cal.innerHTML="";
 
-if(a.stability==="Sedang")
-return "📈 Siklus cukup stabil. Pantau perubahan.";
+let a=analyze();
+let avg=Math.round(a.avg);
 
-return "⚠ Siklus bervariasi. Perhatikan kesehatan.";
+let today=new Date();
+let y=today.getFullYear();
+let m=today.getMonth();
+
+let days=new Date(y,m+1,0).getDate();
+
+let predicted=null;
+if(data.length && avg){
+predicted=new Date(data[data.length-1]);
+predicted.setDate(predicted.getDate()+avg);
+}
+
+for(let d=1;d<=days;d++){
+let cell=document.createElement("div");
+cell.className="day";
+cell.textContent=d;
+
+let dateStr=new Date(y,m,d)
+.toISOString().split("T")[0];
+
+if(data.includes(dateStr))
+cell.classList.add("period");
+
+if(predicted &&
+predicted.getDate()===d &&
+predicted.getMonth()===m)
+cell.classList.add("prediction");
+
+cal.appendChild(cell);
+}
 }
 
 function render(){
-let a=analyze();
-
-document.getElementById("prediction").innerHTML=
-"Prediksi berikutnya: <b>"+predict(a.avg)+"</b>";
-
-document.getElementById("stats").innerHTML=`
-Rata-rata siklus: ${a.avg?Math.round(a.avg)+" hari":"-"}<br>
-Stabilitas: ${a.stability}<br>
-Confidence: ${a.confidence}<br>
-${insight(a)}
-`;
-
 let list=document.getElementById("history");
 list.innerHTML="";
 
 data.forEach(d=>{
 let li=document.createElement("li");
-li.textContent=new Date(d).toLocaleDateString();
+li.textContent=d;
 list.appendChild(li);
 });
 
+let a=analyze();
+
+if(a.avg){
+let next=new Date(data[data.length-1]);
+next.setDate(next.getDate()+Math.round(a.avg));
+
+document.getElementById("prediction").innerHTML=
+"Perkiraan: <b>"+next.toDateString()+"</b>";
+
+document.getElementById("stats").innerHTML=
+"Rata-rata siklus: "+
+Math.round(a.avg)+" hari<br>"+
+"Confidence: "+a.conf;
+
 drawChart(a.intervals);
+}else{
+document.getElementById("stats").innerHTML=
+"Tambahkan minimal 2 data.";
+}
+
+buildCalendar();
 }
 
 render();
-</script>
 
+/* service worker */
+
+if("serviceWorker" in navigator){
+navigator.serviceWorker.register("service-worker.js");
+}
+</script>
 
 </body>
 </html>
