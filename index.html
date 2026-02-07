@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>🌙 Luna Premium Tracker</title>
+<title>🌙 Luna Analytics Pro</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
@@ -9,7 +9,7 @@ body{
 font-family:system-ui;
 background:#fff5f8;
 padding:20px;
-max-width:520px;
+max-width:540px;
 margin:auto;
 transition:.3s;
 }
@@ -49,9 +49,6 @@ border-radius:8px;
 border:1px solid #ddd;
 }
 
-.small{font-size:14px;color:#666;}
-.dark .small{color:#aaa;}
-
 .dashboard{
 display:grid;
 grid-template-columns:1fr 1fr;
@@ -66,9 +63,10 @@ text-align:center;
 font-weight:bold;
 }
 
-.dark .metric{
-background:#333;
-}
+.dark .metric{background:#333;}
+
+.small{font-size:14px;color:#666;}
+.dark .small{color:#aaa;}
 
 #calendar{
 display:grid;
@@ -109,7 +107,7 @@ background:#fff;
 
 <body>
 
-<h1>🌙 Luna Premium</h1>
+<h1>🌙 Luna Analytics Pro</h1>
 
 <div class="card">
 <select id="profile"></select>
@@ -124,12 +122,13 @@ background:#fff;
 </div>
 
 <div class="card">
-<h3>Premium Dashboard</h3>
+<h3>Analytics Dashboard</h3>
 <div class="dashboard">
-<div class="metric" id="mAvg">-</div>
-<div class="metric" id="mTrend">-</div>
-<div class="metric" id="mStability">-</div>
-<div class="metric" id="mNext">-</div>
+<div class="metric" id="avg"></div>
+<div class="metric" id="var"></div>
+<div class="metric" id="trend"></div>
+<div class="metric" id="next"></div>
+<div class="metric" id="ovu"></div>
 </div>
 <p class="small" id="insight"></p>
 </div>
@@ -204,17 +203,17 @@ render();
 }
 
 function resetAll(){
-if(confirm("Reset data profile ini?")){
+if(confirm("Reset profile ini?")){
 profiles[current]=[];
 saveProfiles();
 render();
 }
 }
 
-// AI ANALYSIS
+// ANALYTICS
 function analyze(){
 let arr=getData();
-if(arr.length<2) return null;
+if(arr.length<2)return null;
 
 let gaps=[];
 for(let i=1;i<arr.length;i++){
@@ -224,13 +223,8 @@ gaps.push((b-a)/86400000);
 }
 
 let avg=gaps.reduce((a,b)=>a+b)/gaps.length;
-
 let variance=gaps.map(x=>(x-avg)**2)
 .reduce((a,b)=>a+b)/gaps.length;
-
-let stability=
-variance<4?"Stabil":
-variance<9?"Cukup":"Variatif";
 
 let trend="Stabil";
 if(gaps.length>=3){
@@ -241,7 +235,7 @@ if(recent>avg+1)trend="Memanjang";
 if(recent<avg-1)trend="Memendek";
 }
 
-return {avg,variance,gaps,stability,trend};
+return {avg,variance,gaps,trend};
 }
 
 // GRAPH
@@ -262,7 +256,6 @@ ctx.beginPath();
 gaps.forEach((v,i)=>{
 let x=step*(i+1);
 let y=c.height-(v/max)*c.height;
-
 if(i===0)ctx.moveTo(x,y);
 else ctx.lineTo(x,y);
 });
@@ -337,21 +330,27 @@ if(a){
 let next=new Date(getData().at(-1).date);
 next.setDate(next.getDate()+Math.round(a.avg));
 
-document.getElementById("mAvg").innerText=
+let ovu=new Date(next);
+ovu.setDate(next.getDate()-14);
+
+document.getElementById("avg").innerText=
 "Avg: "+Math.round(a.avg)+" hari";
 
-document.getElementById("mTrend").innerText=
+document.getElementById("var").innerText=
+"Variasi: "+Math.round(a.variance);
+
+document.getElementById("trend").innerText=
 "Trend: "+a.trend;
 
-document.getElementById("mStability").innerText=
-"Stabilitas: "+a.stability;
-
-document.getElementById("mNext").innerText=
+document.getElementById("next").innerText=
 "Next: "+next.toLocaleDateString();
 
+document.getElementById("ovu").innerText=
+"Ovulasi: "+ovu.toLocaleDateString();
+
 document.getElementById("insight").innerText=
-"Siklus "+a.stability+
-" dengan tren "+a.trend+
+"Siklus "+a.trend+
+" dengan variasi "+Math.round(a.variance)+
 ". Pantau kesehatan secara rutin.";
 
 drawChart(a.gaps);
