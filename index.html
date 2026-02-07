@@ -10,11 +10,18 @@ body{
 font-family:system-ui;
 background:#fff5f8;
 padding:20px;
-max-width:500px;
+max-width:520px;
 margin:auto;
+transition:.3s;
+}
+
+.dark{
+background:#1f1f1f;
+color:white;
 }
 
 h1{text-align:center;color:#d63384;}
+.dark h1{color:#ff8fb3;}
 
 .card{
 background:white;
@@ -23,6 +30,10 @@ border-radius:12px;
 box-shadow:0 3px 8px rgba(0,0,0,0.1);
 margin-bottom:15px;
 animation:fade .4s ease;
+}
+
+.dark .card{
+background:#2b2b2b;
 }
 
 @keyframes fade{
@@ -42,11 +53,17 @@ font-size:16px;
 cursor:pointer;
 }
 
-.secondary{background:#999;}
+.secondary{background:#777;}
 
-input{width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;}
+input{
+width:100%;
+padding:10px;
+border-radius:8px;
+border:1px solid #ddd;
+}
 
 .small{font-size:14px;color:#666;}
+.dark .small{color:#aaa;}
 
 #calendarNav{
 display:flex;
@@ -67,15 +84,25 @@ text-align:center;
 border-radius:8px;
 background:#f5f5f5;
 font-size:14px;
+position:relative;
 }
+
+.dark .day{background:#3a3a3a;}
 
 .today{outline:2px solid #333;}
 
-.period{background:#ff4d88;color:white;font-weight:bold;}
+.period{background:#ff4d88;color:white;}
 
 .prediction{background:#6c5ce7;color:white;}
 
 .ovulation{background:#00b894;color:white;}
+
+.mood{
+position:absolute;
+bottom:2px;
+right:2px;
+font-size:12px;
+}
 </style>
 </head>
 
@@ -85,12 +112,13 @@ font-size:14px;
 
 <div class="card">
 <input type="date" id="date">
-<button onclick="add()">Simpan Tanggal</button>
+<button onclick="add()">Simpan Tanggal + Mood</button>
 <button class="secondary" onclick="resetAll()">Reset Data</button>
+<button class="secondary" onclick="toggleDark()">🌗 Dark Mode</button>
 </div>
 
 <div class="card">
-<h3>Prediksi berikutnya</h3>
+<h3>AI Prediction</h3>
 <div id="prediction">Belum ada data</div>
 </div>
 
@@ -110,10 +138,6 @@ font-size:14px;
 </div>
 
 <div id="calendar"></div>
-
-<p class="small">
-🔴 period | 🟣 prediksi | 🟢 ovulasi
-</p>
 </div>
 
 <div class="card">
@@ -122,6 +146,18 @@ font-size:14px;
 </div>
 
 <script>
+
+// DARK MODE
+if(localStorage.getItem("dark")==="1")
+document.body.classList.add("dark");
+
+function toggleDark(){
+document.body.classList.toggle("dark");
+localStorage.setItem("dark",
+document.body.classList.contains("dark")?"1":"0");
+}
+
+// DATA
 let data=JSON.parse(localStorage.getItem("luna")||"[]");
 let current=new Date();
 
@@ -130,10 +166,12 @@ localStorage.setItem("luna",JSON.stringify(data));
 }
 
 function add(){
-let val=document.getElementById("date").value;
-if(!val)return;
-data.push(val);
-data.sort();
+let date=document.getElementById("date").value;
+if(!date)return;
+
+let mood=prompt("Mood hari ini? 😊😴😡❤️","");
+data.push({date,mood});
+data.sort((a,b)=>a.date.localeCompare(b.date));
 save();
 render();
 }
@@ -146,17 +184,27 @@ render();
 }
 }
 
+// AI LEARNING
 function analyze(){
 if(data.length<2) return {avg:0,conf:"rendah",gaps:[]};
 
 let gaps=[];
 for(let i=1;i<data.length;i++){
-let a=new Date(data[i-1]);
-let b=new Date(data[i]);
+let a=new Date(data[i-1].date);
+let b=new Date(data[i].date);
 gaps.push((b-a)/86400000);
 }
 
-let avg=gaps.reduce((a,b)=>a+b,0)/gaps.length;
+// weighted learning
+let total=0,weight=0;
+gaps.forEach((v,i)=>{
+let w=i+1;
+total+=v*w;
+weight+=w;
+});
+
+let avg=total/weight;
+
 let variance=gaps.map(g=>(g-avg)**2)
 .reduce((a,b)=>a+b,0)/gaps.length;
 
@@ -190,6 +238,7 @@ else ctx.lineTo(x,y);
 ctx.stroke();
 }
 
+// CALENDAR
 function buildCalendar(){
 let cal=document.getElementById("calendar");
 cal.innerHTML="";
@@ -206,15 +255,14 @@ let today=new Date();
 let a=analyze();
 let avg=Math.round(a.avg);
 
-let predicted=null;
-let ovulation=null;
+let predicted=null,ovu=null;
 
 if(data.length && avg){
-predicted=new Date(data[data.length-1]);
+predicted=new Date(data[data.length-1].date);
 predicted.setDate(predicted.getDate()+avg);
 
-ovulation=new Date(predicted);
-ovulation.setDate(predicted.getDate()-14);
+ovu=new Date(predicted);
+ovu.setDate(predicted.getDate()-14);
 }
 
 for(let d=1;d<=days;d++){
@@ -228,15 +276,24 @@ let iso=date.toISOString().split("T")[0];
 if(date.toDateString()===today.toDateString())
 cell.classList.add("today");
 
-if(data.includes(iso))
+let record=data.find(x=>x.date===iso);
+
+if(record){
 cell.classList.add("period");
+if(record.mood){
+let mood=document.createElement("div");
+mood.className="mood";
+mood.textContent=record.mood;
+cell.appendChild(mood);
+}
+}
 
 if(predicted &&
 date.toDateString()===predicted.toDateString())
 cell.classList.add("prediction");
 
-if(ovulation &&
-date.toDateString()===ovulation.toDateString())
+if(ovu &&
+date.toDateString()===ovu.toDateString())
 cell.classList.add("ovulation");
 
 cal.appendChild(cell);
@@ -248,20 +305,21 @@ current.setMonth(current.getMonth()+n);
 buildCalendar();
 }
 
+// RENDER
 function render(){
 let list=document.getElementById("history");
 list.innerHTML="";
 
 data.forEach(d=>{
 let li=document.createElement("li");
-li.textContent=d;
+li.textContent=d.date+" "+(d.mood||"");
 list.appendChild(li);
 });
 
 let a=analyze();
 
 if(a.avg){
-let next=new Date(data[data.length-1]);
+let next=new Date(data[data.length-1].date);
 next.setDate(next.getDate()+Math.round(a.avg));
 
 let ovu=new Date(next);
@@ -272,8 +330,8 @@ document.getElementById("prediction").innerHTML=
 "Ovulation: <b>"+ovu.toDateString()+"</b>";
 
 document.getElementById("stats").innerHTML=
-"Rata-rata siklus: "+Math.round(a.avg)+" hari<br>"+
-"Confidence AI: "+a.conf;
+"AI avg cycle: "+Math.round(a.avg)+" hari<br>"+
+"Confidence: "+a.conf;
 
 drawChart(a.gaps);
 }else{
@@ -289,6 +347,7 @@ render();
 if("serviceWorker" in navigator){
 navigator.serviceWorker.register("service-worker.js");
 }
+
 </script>
 
 </body>
